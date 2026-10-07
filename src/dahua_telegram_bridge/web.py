@@ -66,6 +66,7 @@ class Store:
             ),
         )
         self.db.commit()
+        self.add_audit(f"notification rule {cur.lastrowid}", "none", "created")
         return dict(self.db.execute("SELECT * FROM rules WHERE id=?", (cur.lastrowid,)).fetchone())
 
     def update_rule(self, rule_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
@@ -83,11 +84,14 @@ class Store:
             ),
         )
         self.db.commit()
+        self.add_audit(f"notification rule {rule_id}", str(dict(current)), str(data))
         return dict(self.db.execute("SELECT * FROM rules WHERE id=?", (rule_id,)).fetchone())
 
     def delete_rule(self, rule_id: int) -> bool:
         cur = self.db.execute("DELETE FROM rules WHERE id=?", (rule_id,))
         self.db.commit()
+        if cur.rowcount:
+            self.add_audit(f"notification rule {rule_id}", "configured", "deleted")
         return cur.rowcount > 0
 
     def channels(self) -> list[dict[str, Any]]:
@@ -101,6 +105,19 @@ class Store:
             "SELECT * FROM audit ORDER BY id DESC LIMIT ?", (max(1, min(limit, 500)),)
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def add_audit(
+        self, setting: str, old_value: str, new_value: str, result: str = "SUCCESS"
+    ) -> None:
+        self.db.execute(
+            "INSERT INTO audit(timestamp,source,setting,old_value,new_value,result) VALUES(datetime('now'),?,?,?,?,?)",
+            ("web", setting, old_value, new_value, result),
+        )
+        self.db.commit()
+
+    def event(self, event_id: str) -> dict[str, Any] | None:
+        row = self.db.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
+        return dict(row) if row else None
 
 
 def _auth(request: web.Request) -> bool:
@@ -177,6 +194,17 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
             }
         )
 
+    async def nvr(_request: web.Request) -> web.Response:
+        return web.json_response(
+            {
+                "host": config.dahua.host,
+                "port": config.dahua.port,
+                "https": config.dahua.https,
+                "connected": service.health.nvr_connected,
+                "channel": config.dahua.channel,
+            }
+        )
+
     async def config_view(_request: web.Request) -> web.Response:
         return web.json_response(
             {
@@ -216,6 +244,14 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         if channel is not None:
             result = [item for item in result if str(item["channel"]) == channel]
         return web.json_response(result)
+
+    async def event_detail(request: web.Request) -> web.Response:
+        item = store.event(request.match_info["id"])
+        return (
+            web.json_response(item)
+            if item
+            else web.json_response({"error": "not found"}, status=404)
+        )
 
     async def rules(_request: web.Request) -> web.Response:
         return web.json_response(store.rules())
@@ -269,8 +305,10 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app.router.add_post("/login", login)
     app.router.add_get("/api/health", health)
     app.router.add_get("/api/system", system)
+    app.router.add_get("/api/nvr", nvr)
     app.router.add_get("/api/config", config_view)
     app.router.add_get("/api/events", events)
+    app.router.add_get("/api/events/{id}", event_detail)
     app.router.add_get("/api/notifications", rules)
     app.router.add_post("/api/notifications", create_rule)
     app.router.add_patch("/api/notifications/{id}", update_rule)

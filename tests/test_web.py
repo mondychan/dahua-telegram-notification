@@ -70,3 +70,5 @@ async def test_event_filtering(web_client):
     response = await web_client.post("/login", json={"username": "admin", "password": "secret"})
     assert response.status == 200
     assert (await web_client.get("/api/events?event_type=Human")).status == 200
+    assert (await web_client.get("/api/nvr")).status == 200
+    assert (await web_client.get("/api/audit")).status == 200

@@ -151,6 +151,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app["session_token"] = secrets.token_urlsafe(32)
     app["csrf_token"] = secrets.token_urlsafe(24)
     app["nvr_info"] = {"expires": 0.0, "data": {}}
+    app["channel_titles"] = {"expires": 0.0, "data": {}}
 
     @web.middleware
     async def auth_middleware(request: web.Request, handler: Any) -> web.StreamResponse:
@@ -216,6 +217,14 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
                 }
             except Exception:
                 app["nvr_info"] = {"expires": time.monotonic() + 10, "data": {}}
+        if time.monotonic() > app["channel_titles"]["expires"] and service.health.nvr_connected:
+            try:
+                app["channel_titles"] = {
+                    "expires": time.monotonic() + 60,
+                    "data": await service.dahua.channel_titles(),
+                }
+            except Exception:
+                app["channel_titles"] = {"expires": time.monotonic() + 10, "data": {}}
         return web.json_response(
             {
                 "host": config.dahua.host,
@@ -224,6 +233,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
                 "connected": service.health.nvr_connected,
                 "channel": config.dahua.channel,
                 "system_info": app["nvr_info"]["data"],
+                "channel_titles": app["channel_titles"]["data"],
             }
         )
 

@@ -73,3 +73,16 @@ class DahuaClient:
                 key, value = line.split("=", 1)
                 result[key.strip()] = value.strip()
         return result
+
+    async def channel_titles(self) -> dict[str, str]:
+        response = await self.client.get(
+            f"{self.config.base_url}/cgi-bin/configManager.cgi",
+            params={"action": "getConfig", "name": "ChannelTitle"},
+        )
+        response.raise_for_status()
+        result: dict[str, str] = {}
+        for line in response.text.splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                result[key.strip()] = value.strip()
+        return result

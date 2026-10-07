@@ -77,6 +77,18 @@ async def test_web_login_and_rule(web_client):
 
 
 @pytest.mark.asyncio
+async def test_admin_navigation_is_rendered_as_html(web_client):
+    assert (
+        await web_client.post("/login", json={"username": "admin", "password": "secret"})
+    ).status == 200
+    response = await web_client.get("/")
+    body = await response.text()
+    assert response.status == 200
+    assert "<button data-tab=dashboard>Dashboard</button>" in body
+    assert "${['dashboard'" not in body
+
+
+@pytest.mark.asyncio
 async def test_event_filtering(web_client):
     response = await web_client.post("/login", json={"username": "admin", "password": "secret"})
     assert response.status == 200

@@ -1,0 +1,25 @@
+dahua:
+  host: ${DAHUA_HOST}
+  port: 80
+  username: ${DAHUA_USERNAME}
+  password: ${DAHUA_PASSWORD}
+  channel: 1
+  https: false
+  stream: event
+telegram:
+  bot_token: ${TELEGRAM_BOT_TOKEN}
+  chat_id: ${TELEGRAM_CHAT_ID}
+events:
+  enabled: [CrossLineDetection, Human, SMD]
+  send_stop: false
+snapshot:
+  enabled: true
+  timeout_ms: 1000
+dedup:
+  enabled: true
+  ttl_seconds: 2
+camera_name: Vjezd / vrata
+logging:
+  level: INFO
+health:
+  port: 8080

@@ -52,6 +52,12 @@ def parse_event(payload: str | bytes) -> Event | None:
     object_type = payload_value(fields, "ObjectType", "object", "Object", "type") or (
         str(nested["ObjectType"]) if "ObjectType" in nested else None
     )
+    if object_type is None:
+        code_lower = event_type.lower()
+        if "vehicle" in code_lower or "car" in code_lower:
+            object_type = "Vehicle"
+        elif "human" in code_lower or "person" in code_lower:
+            object_type = "Human"
     rule = payload_value(fields, "Name", "Rule", "rule", "EventName") or (
         str(nested["Name"]) if "Name" in nested else None
     )

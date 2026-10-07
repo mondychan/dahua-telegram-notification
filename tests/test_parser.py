@@ -29,3 +29,17 @@ def test_parse_real_video_motion_payload():
     assert event and event.channel == 2
     assert event.rule_name == "zahrada"
     assert event.timestamp.strftime("%Y-%m-%d %H:%M:%S") == "2026-10-07 13:26:48"
+
+
+def test_parse_real_smart_motion_vehicle_payload():
+    payload = """Code=SmartMotionVehicle;action=Start;index=4;data={
+  "LocaleTime" : "2026-10-07 14:36:59",
+  "Name" : "IPC",
+  "RealUTC" : 1791376618,
+  "UTC" : 1791376619
+}
+"""
+    event = parse_event(payload)
+    assert event and event.event_type == "SmartMotionVehicle"
+    assert event.object_type == "Vehicle"
+    assert event.channel == 4 and event.rule_name == "IPC"

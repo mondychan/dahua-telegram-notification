@@ -34,6 +34,9 @@ ADMIN_HTML = ADMIN_HTML.replace(
     "</main><script>const cards=document.getElementById('cards'),nvrdata=document.getElementById('nvrdata'),chdata=document.getElementById('chdata'),evdata=document.getElementById('evdata'),rules=document.getElementById('rules'),logdata=document.getElementById('logdata'),settingsdata=document.getElementById('settingsdata'),sysdata=document.getElementById('sysdata');const tabs=",
     1,
 )
+# Escape the newline separator for JavaScript, rather than embedding a literal
+# line break inside the quoted string.
+ADMIN_HTML = ADMIN_HTML.replace("join('\n')", "join('\\\\n')", 1)
 
 
 class Store:

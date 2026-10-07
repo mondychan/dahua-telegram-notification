@@ -13,6 +13,8 @@ from aiohttp import web
 
 INDEX_HTML = """<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Dahua Bridge</title><style>body{margin:0;background:#111827;color:#e5e7eb;font:14px system-ui}aside{position:fixed;width:210px;height:100vh;background:#0b1220;padding:24px;box-sizing:border-box}main{margin-left:210px;padding:28px;max-width:1100px}.nav{display:block;color:#9ca3af;padding:10px 0}.nav:hover{color:white}h1{margin-top:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.card{background:#1f2937;border:1px solid #374151;padding:18px;border-radius:6px}.value{font-size:24px;margin-top:8px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{text-align:left;padding:9px;border-bottom:1px solid #374151}code,pre{font-family:ui-monospace,monospace}.ok{color:#34d399}.bad{color:#f87171}</style></head><body><aside><h2>Dahua Bridge</h2><a class=nav href=#dashboard>Dashboard</a><a class=nav href=#nvr>NVR</a><a class=nav href=#channels>Channels</a><a class=nav href=#events>Events</a><a class=nav href=#notifications>Notifications</a><a class=nav href=#logs>Live Log</a><a class=nav href=#settings>Settings</a><a class=nav href=#system>System</a></aside><main><h1>Dashboard</h1><div id=cards class=grid></div><h2>Recent events</h2><table><thead><tr><th>Time</th><th>Channel</th><th>Event</th><th>Action</th><th>Rule</th></tr></thead><tbody id=events></tbody></table></main><script>async function refresh(){const h=await (await fetch('/api/health')).json();const s=await (await fetch('/api/system')).json();document.querySelector('#cards').innerHTML=[['NVR',h.nvr_connected?'CONNECTED':'DISCONNECTED'],['Events',h.events_received],['Processed',h.processed_events],['Snapshots',h.snapshots_success],['Telegram',s.telegram_enabled?(s.dry_run?'DRY RUN':'ENABLED'):'DISABLED'],['Reconnects',h.reconnect_count]].map(x=>`<div class=card><div>${x[0]}</div><div class=value>${x[1]}</div></div>`).join('');const e=await (await fetch('/api/events?limit=20')).json();document.querySelector('#events').innerHTML=e.map(x=>`<tr><td>${x.timestamp}</td><td>${x.channel??''}</td><td>${x.event_type}</td><td>${x.action}</td><td>${x.rule_name??''}</td></tr>`).join('')}refresh();setInterval(refresh,3000);</script></body></html>"""
 
+LOGIN_HTML = """<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Dahua Bridge Login</title><style>body{background:#111827;color:#e5e7eb;font:16px system-ui;display:grid;place-items:center;height:100vh}form{background:#1f2937;padding:28px;border-radius:8px;width:280px}input,button{display:block;width:100%;box-sizing:border-box;margin:10px 0;padding:10px;border-radius:4px;border:1px solid #4b5563}button{background:#2563eb;color:white;border:0}</style><form id=f><h2>Dahua Bridge</h2><input id=u placeholder=username autocomplete=username><input id=p type=password placeholder=password autocomplete=current-password><button>Sign in</button><p id=e></p></form><script>f.onsubmit=async e=>{e.preventDefault();let r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:p.value})});if(r.ok)location.href='/';else document.querySelector('#e').textContent='Invalid credentials'}</script>"""
+
 
 class Store:
     def __init__(self, path: str = "/data/bridge.sqlite3") -> None:
@@ -132,7 +134,9 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
 
     app.middlewares.append(auth_middleware)
 
-    async def index(_request: web.Request) -> web.Response:
+    async def index(request: web.Request) -> web.Response:
+        if not _auth(request):
+            return web.Response(text=LOGIN_HTML, content_type="text/html")
         return web.Response(text=INDEX_HTML, content_type="text/html")
 
     async def login(request: web.Request) -> web.Response:

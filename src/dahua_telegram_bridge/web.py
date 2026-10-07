@@ -119,6 +119,15 @@ class Store:
         row = self.db.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
         return dict(row) if row else None
 
+    def matching_rule(
+        self, channel: int | None, event_type: str, object_type: str | None
+    ) -> dict[str, Any] | None:
+        rows = self.db.execute(
+            "SELECT * FROM rules WHERE event_type=? AND (channel IS NULL OR channel=?) AND (object_type IS NULL OR object_type=?) ORDER BY object_type IS NOT NULL DESC, channel IS NOT NULL DESC",
+            (event_type, channel, object_type),
+        ).fetchall()
+        return dict(rows[0]) if rows else None
+
 
 def _auth(request: web.Request) -> bool:
     expected = request.app["admin_password"]

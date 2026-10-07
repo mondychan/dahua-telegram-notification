@@ -19,6 +19,16 @@ class BridgeService:
         self.live_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 
     def _allowed(self, event: Event) -> bool:
+        if self.store is not None:
+            rule = self.store.matching_rule(
+                event.channel + self.config.event_channel_offset
+                if event.channel is not None
+                else None,
+                event.event_type,
+                event.object_type,
+            )
+            if rule is not None:
+                return bool(rule["enabled"] and (self.config.send_stop or event.is_start))
         if not self.config.send_stop and not event.is_start:
             return False
         return bool(

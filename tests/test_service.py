@@ -72,3 +72,22 @@ async def test_dedup_distinguishes_objects_and_ttl(monkeypatch):
     service._seen.clear()
     await service.handle(first)
     assert len(t.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_persistent_rule_overrides_allowlist():
+    from dahua_telegram_bridge.web import Store
+    import tempfile
+    from pathlib import Path
+
+    cfg = AppConfig(DahuaConfig("n"), TelegramConfig("token", "chat"), {"Human"})
+    d, t = FakeDahua(), FakeTelegram()
+    service = BridgeService(cfg, d, t)
+    service.store = Store(str(Path(tempfile.mkdtemp()) / "db.sqlite"))
+    service.store.create_rule(
+        {"channel": 1, "event_type": "Human", "object_type": "Human", "enabled": False}
+    )
+    event = parse_event("Code=Human\naction=Start\nindex=0\nObjectType=Human")
+    assert event
+    await service.handle(event)
+    assert not t.calls

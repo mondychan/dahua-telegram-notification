@@ -4,6 +4,7 @@ dahua:
   username: ${DAHUA_USERNAME}
   password: ${DAHUA_PASSWORD}
   channel: 1
+event_channel_offset: 1
   https: false
   stream: event
 telegram:

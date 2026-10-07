@@ -46,7 +46,7 @@ class BridgeService:
             f"Time: {event.display_timestamp}",
         ]
         if event.channel is not None:
-            lines.insert(2, f"Channel: {event.channel}")
+            lines.insert(2, f"Channel: {event.channel + self.config.event_channel_offset}")
         if obj:
             lines.insert(3, f"Object: {obj}")
         return "\n".join(lines)
@@ -67,9 +67,12 @@ class BridgeService:
         if self.config.snapshot_enabled:
             try:
                 timing.snapshot_started = time.monotonic()
-                photo = await self.dahua.snapshot(
-                    event.channel or self.config.dahua.channel, self.config.snapshot_timeout_ms
+                snapshot_channel = (
+                    event.channel + self.config.event_channel_offset
+                    if event.channel is not None
+                    else self.config.dahua.channel
                 )
+                photo = await self.dahua.snapshot(snapshot_channel, self.config.snapshot_timeout_ms)
                 timing.snapshot_received = time.monotonic()
                 self.health.snapshots_success += 1
                 self.health.last_snapshot = utcnow()

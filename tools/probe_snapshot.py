@@ -9,8 +9,12 @@ async def main() -> None:
     config = load_config(os.getenv("DAHUA_CONFIG"))
     client = DahuaClient(config.dahua)
     try:
-        data = await client.snapshot(config.dahua.channel, 3000)
-        print(f"snapshot_ok bytes={len(data)} content_type=image/jpeg")
+        for channel in (0, 1):
+            try:
+                data = await client.snapshot(channel, 3000)
+                print(f"snapshot_ok channel={channel} bytes={len(data)} content_type=image/jpeg")
+            except Exception as exc:
+                print(f"snapshot_error channel={channel} type={type(exc).__name__} detail={exc}")
     except Exception as exc:
         print(f"snapshot_error type={type(exc).__name__} detail={exc}")
     finally:

@@ -75,6 +75,7 @@ class AppConfig:
     health_host: str = "0.0.0.0"
     health_port: int = 8080
     snapshot_mode: str = "auto"
+    event_channel_offset: int = 1
 
 
 def load_config(path: str | None = None) -> AppConfig:
@@ -119,6 +120,9 @@ def load_config(path: str | None = None) -> AppConfig:
         health_host=raw.get("health", {}).get("host", "0.0.0.0"),
         health_port=int(raw.get("health", {}).get("port", 8080)),
         snapshot_mode=raw.get("snapshot_mode", os.getenv("SNAPSHOT_MODE", "auto")),
+        event_channel_offset=int(
+            raw.get("event_channel_offset", os.getenv("DAHUA_EVENT_CHANNEL_OFFSET", 1))
+        ),
     )
 
 

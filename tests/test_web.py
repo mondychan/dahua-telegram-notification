@@ -11,7 +11,15 @@ from dahua_telegram_bridge.web import Store, create_web_app
 async def web_client(tmp_path):
     service = SimpleNamespace(health=HealthState())
     config = SimpleNamespace(
+        dahua=SimpleNamespace(host="nvr", port=80, username="admin", channel=1, https=False),
         telegram=SimpleNamespace(enabled=False),
+        enabled_events={"Human"},
+        send_stop=False,
+        snapshot_enabled=True,
+        snapshot_timeout_ms=1000,
+        snapshot_mode="auto",
+        dedup_enabled=True,
+        dedup_ttl_seconds=2,
         admin_username="admin",
         admin_password="secret",
         data_path=str(tmp_path / "db.sqlite3"),

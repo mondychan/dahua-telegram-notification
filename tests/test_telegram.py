@@ -42,3 +42,21 @@ async def test_telegram_dry_run(monkeypatch):
     await client.send("hello")
     Config.enabled = True
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_telegram_429_retry_after(monkeypatch):
+    client = TelegramClient(Config())
+    calls = 0
+
+    async def post(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        status = 429 if calls == 1 else 200
+        headers = {"retry-after": "0"} if status == 429 else {}
+        return httpx.Response(status, headers=headers, request=httpx.Request("POST", "http://x"))
+
+    monkeypatch.setattr(client.client, "post", post)
+    await client.send("hello")
+    assert calls == 2
+    await client.close()

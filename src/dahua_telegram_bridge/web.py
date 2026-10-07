@@ -94,6 +94,12 @@ class Store:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def audit(self, limit: int = 100) -> list[dict[str, Any]]:
+        rows = self.db.execute(
+            "SELECT * FROM audit ORDER BY id DESC LIMIT ?", (max(1, min(limit, 500)),)
+        ).fetchall()
+        return [dict(row) for row in rows]
+
 
 def _auth(request: web.Request) -> bool:
     expected = request.app["admin_password"]
@@ -167,8 +173,45 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
             }
         )
 
+    async def config_view(_request: web.Request) -> web.Response:
+        return web.json_response(
+            {
+                "dahua": {
+                    "host": config.dahua.host,
+                    "port": config.dahua.port,
+                    "username": config.dahua.username,
+                    "channel": config.dahua.channel,
+                    "https": config.dahua.https,
+                },
+                "telegram": {
+                    "enabled": config.telegram.enabled,
+                    "configured": bool(config.telegram.bot_token and config.telegram.chat_id),
+                    "token": "**************" if config.telegram.bot_token else None,
+                    "chat_id_configured": bool(config.telegram.chat_id),
+                },
+                "events": {"enabled": sorted(config.enabled_events), "send_stop": config.send_stop},
+                "snapshot": {
+                    "enabled": config.snapshot_enabled,
+                    "timeout_ms": config.snapshot_timeout_ms,
+                    "mode": config.snapshot_mode,
+                },
+                "dedup": {"enabled": config.dedup_enabled, "ttl_seconds": config.dedup_ttl_seconds},
+                "admin": {
+                    "username": config.admin_username,
+                    "password_configured": bool(config.admin_password),
+                },
+            }
+        )
+
     async def events(request: web.Request) -> web.Response:
-        return web.json_response(store.events(int(request.query.get("limit", "100"))))
+        result = store.events(int(request.query.get("limit", "100")))
+        event_type = request.query.get("event_type")
+        channel = request.query.get("channel")
+        if event_type:
+            result = [item for item in result if item["event_type"] == event_type]
+        if channel is not None:
+            result = [item for item in result if str(item["channel"]) == channel]
+        return web.json_response(result)
 
     async def rules(_request: web.Request) -> web.Response:
         return web.json_response(store.rules())
@@ -199,6 +242,9 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     async def channels(_request: web.Request) -> web.Response:
         return web.json_response(store.channels())
 
+    async def audit(_request: web.Request) -> web.Response:
+        return web.json_response(store.audit())
+
     async def live_events(_request: web.Request) -> web.StreamResponse:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=50)
         service.live_subscribers.add(queue)
@@ -219,11 +265,13 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app.router.add_post("/login", login)
     app.router.add_get("/api/health", health)
     app.router.add_get("/api/system", system)
+    app.router.add_get("/api/config", config_view)
     app.router.add_get("/api/events", events)
     app.router.add_get("/api/notifications", rules)
     app.router.add_post("/api/notifications", create_rule)
     app.router.add_patch("/api/notifications/{id}", update_rule)
     app.router.add_delete("/api/notifications/{id}", delete_rule)
     app.router.add_get("/api/channels", channels)
+    app.router.add_get("/api/audit", audit)
     app.router.add_get("/api/events/live", live_events)
     return app

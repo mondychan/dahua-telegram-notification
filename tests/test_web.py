@@ -32,6 +32,9 @@ async def test_web_requires_auth(web_client):
 async def test_web_login_and_rule(web_client):
     response = await web_client.post("/login", json={"username": "admin", "password": "secret"})
     assert response.status == 200
+    config = await web_client.get("/api/config")
+    assert config.status == 200
+    assert "bot_token" not in await config.text()
     csrf = web_client.session.cookie_jar.filter_cookies(web_client.make_url("/"))[
         "csrf_token"
     ].value
@@ -52,3 +55,10 @@ async def test_web_login_and_rule(web_client):
         f"/api/notifications/{rule['id']}", headers={"X-CSRF-Token": csrf}
     )
     assert response.status == 200
+
+
+@pytest.mark.asyncio
+async def test_event_filtering(web_client):
+    response = await web_client.post("/login", json={"username": "admin", "password": "secret"})
+    assert response.status == 200
+    assert (await web_client.get("/api/events?event_type=Human")).status == 200

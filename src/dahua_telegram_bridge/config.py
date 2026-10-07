@@ -19,6 +19,20 @@ def _expand(value: Any) -> Any:
     return value
 
 
+def _load_dotenv() -> None:
+    """Load a local .env without overriding explicitly exported variables."""
+    env_path = Path.cwd() / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key, value = key.strip(), value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
 @dataclass(slots=True)
 class DahuaConfig:
     host: str
@@ -64,6 +78,7 @@ class AppConfig:
 
 
 def load_config(path: str | None = None) -> AppConfig:
+    _load_dotenv()
     raw: dict[str, Any] = {}
     if path and Path(path).exists():
         raw = _expand(yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {})

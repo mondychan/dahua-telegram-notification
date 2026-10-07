@@ -45,6 +45,16 @@ ADMIN_HTML = ADMIN_HTML.replace(
     "<td>${x.rule_name||''}</td><td>${x.decision||''}</td><td>${x.reason||''}</td></tr>`",
     1,
 )
+ADMIN_HTML = ADMIN_HTML.replace(
+    "logdata.textContent=(await j('/api/logs')).map(x=>`${x.level} ${x.logger} ${x.message}`).join('\\\\n')",
+    "logdata.textContent=(await j('/api/logs')).map(x=>`${new Date(x.timestamp*1000).toISOString()}  ${x.level.padEnd(7)} ${x.logger}\\\\n  ${x.message}`).join('\\\\n\\\\n')",
+    1,
+)
+ADMIN_HTML = ADMIN_HTML.replace(
+    "pre{background:#030712;padding:12px;overflow:auto}",
+    "pre{background:#030712;padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word;line-height:1.5}",
+    1,
+)
 
 
 class Store:

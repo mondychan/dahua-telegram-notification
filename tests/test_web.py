@@ -89,6 +89,8 @@ async def test_admin_navigation_is_rendered_as_html(web_client):
     assert "document.getElementById('cards')" in body
     assert "document.getElementById('nvrdata')" in body
     assert "join('\\\\n')" in body
+    assert "toISOString()" in body
+    assert "white-space:pre-wrap" in body
 
 
 @pytest.mark.asyncio

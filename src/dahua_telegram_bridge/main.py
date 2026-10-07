@@ -8,6 +8,7 @@ from .config import load_config, validate_config
 from .dahua.client import DahuaClient
 from .service import BridgeService
 from .telegram.client import TelegramClient
+from .web import create_web_app
 
 
 async def run(config_path: str | None = None) -> None:
@@ -19,7 +20,8 @@ async def run(config_path: str | None = None) -> None:
     )
     dahua, telegram = DahuaClient(config.dahua), TelegramClient(config.telegram)
     service = BridgeService(config, dahua, telegram)
-    app = web.Application()
+    app = create_web_app(service, config)
+    service.store = app["store"]
 
     async def health(_request: web.Request) -> web.Response:
         return web.json_response(

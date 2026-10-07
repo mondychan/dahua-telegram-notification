@@ -15,6 +15,8 @@ class BridgeService:
         self.config, self.dahua, self.telegram = config, dahua, telegram
         self.health = HealthState()
         self._seen: dict[str, float] = {}
+        self.store: Any = None
+        self.live_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 
     def _allowed(self, event: Event) -> bool:
         if not self.config.send_stop and not event.is_start:
@@ -61,6 +63,20 @@ class BridgeService:
             self.health.events_deduplicated += 1
             return
         timing = Timing(received)
+        if self.store is not None:
+            self.store.add_event(event)
+        payload = {
+            "id": event.id,
+            "timestamp": event.timestamp.isoformat(),
+            "event_type": event.event_type,
+            "action": event.action,
+            "channel": event.channel,
+            "object_type": event.object_type,
+            "rule_name": event.rule_name,
+        }
+        for queue in list(self.live_subscribers):
+            if not queue.full():
+                queue.put_nowait(payload)
         self.health.last_event = utcnow()
         self.health.processed_events += 1
         photo = None

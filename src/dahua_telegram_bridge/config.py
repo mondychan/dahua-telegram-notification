@@ -76,6 +76,9 @@ class AppConfig:
     health_port: int = 8080
     snapshot_mode: str = "auto"
     event_channel_offset: int = 1
+    data_path: str = "/data/bridge.sqlite3"
+    admin_username: str = "admin"
+    admin_password: str = ""
 
 
 def load_config(path: str | None = None) -> AppConfig:
@@ -123,6 +126,9 @@ def load_config(path: str | None = None) -> AppConfig:
         event_channel_offset=int(
             raw.get("event_channel_offset", os.getenv("DAHUA_EVENT_CHANNEL_OFFSET", 1))
         ),
+        data_path=raw.get("data_path", os.getenv("DATA_PATH", "/data/bridge.sqlite3")),
+        admin_username=os.getenv("ADMIN_USERNAME", "admin"),
+        admin_password=os.getenv("ADMIN_PASSWORD", ""),
     )
 
 

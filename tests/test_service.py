@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from dahua_telegram_bridge.config import AppConfig, DahuaConfig, TelegramConfig
 from dahua_telegram_bridge.dahua.parser import parse_event
@@ -106,3 +108,32 @@ async def test_live_subscriber_receives_normalized_event():
     await service.handle(event)
     payload = await queue.get()
     assert payload["event_type"] == "Human" and payload["action"] == "Start"
+
+
+@pytest.mark.asyncio
+async def test_run_reconnects_after_stream_failure(monkeypatch):
+    cfg = AppConfig(DahuaConfig("n"), TelegramConfig("token", "chat"), {"Human"})
+
+    class ReconnectingDahua(FakeDahua):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        async def events(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise ConnectionError("reset")
+            event = b"Code=Human;action=Start;index=0;ObjectType=Human"
+            yield event
+            raise asyncio.CancelledError
+
+    dahua = ReconnectingDahua()
+    service = BridgeService(cfg, dahua, FakeTelegram())
+
+    async def no_sleep(_delay):
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    with pytest.raises(asyncio.CancelledError):
+        await service.run()
+    assert dahua.calls >= 2

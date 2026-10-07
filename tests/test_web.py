@@ -12,7 +12,7 @@ async def web_client(tmp_path):
     service = SimpleNamespace(health=HealthState())
     config = SimpleNamespace(
         dahua=SimpleNamespace(host="nvr", port=80, username="admin", channel=1, https=False),
-        telegram=SimpleNamespace(enabled=False),
+        telegram=SimpleNamespace(enabled=False, bot_token="", chat_id=""),
         enabled_events={"Human"},
         send_stop=False,
         snapshot_enabled=True,

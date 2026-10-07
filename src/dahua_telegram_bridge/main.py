@@ -9,6 +9,7 @@ from .dahua.client import DahuaClient
 from .service import BridgeService
 from .telegram.client import TelegramClient
 from .web import create_web_app
+from .logbuffer import LogBuffer
 
 
 async def run(config_path: str | None = None) -> None:
@@ -18,10 +19,14 @@ async def run(config_path: str | None = None) -> None:
         level=getattr(logging, config.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    log_buffer = LogBuffer()
+    log_buffer.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger().addHandler(log_buffer)
     dahua, telegram = DahuaClient(config.dahua), TelegramClient(config.telegram)
     service = BridgeService(config, dahua, telegram)
     app = create_web_app(service, config)
     service.store = app["store"]
+    app["log_buffer"] = log_buffer
 
     async def health(_request: web.Request) -> web.Response:
         return web.json_response(

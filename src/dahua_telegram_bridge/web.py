@@ -302,6 +302,12 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     async def audit(_request: web.Request) -> web.Response:
         return web.json_response(store.audit())
 
+    async def logs(request: web.Request) -> web.Response:
+        buffer = request.app.get("log_buffer")
+        return web.json_response(
+            buffer.recent(int(request.query.get("limit", "100"))) if buffer else []
+        )
+
     async def live_events(_request: web.Request) -> web.StreamResponse:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=50)
         service.live_subscribers.add(queue)
@@ -333,5 +339,6 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app.router.add_delete("/api/notifications/{id}", delete_rule)
     app.router.add_get("/api/channels", channels)
     app.router.add_get("/api/audit", audit)
+    app.router.add_get("/api/logs", logs)
     app.router.add_get("/api/events/live", live_events)
     return app

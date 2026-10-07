@@ -41,4 +41,14 @@ async def test_web_login_and_rule(web_client):
         headers={"X-CSRF-Token": csrf},
     )
     assert response.status == 201
-    assert (await web_client.get("/api/notifications")).status == 200
+    rules = await web_client.get("/api/notifications")
+    assert rules.status == 200
+    rule = (await rules.json())[0]
+    response = await web_client.patch(
+        f"/api/notifications/{rule['id']}", json={"enabled": False}, headers={"X-CSRF-Token": csrf}
+    )
+    assert response.status == 200 and (await response.json())["enabled"] == 0
+    response = await web_client.delete(
+        f"/api/notifications/{rule['id']}", headers={"X-CSRF-Token": csrf}
+    )
+    assert response.status == 200

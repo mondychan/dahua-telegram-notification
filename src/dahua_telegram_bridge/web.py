@@ -66,6 +66,34 @@ class Store:
         self.db.commit()
         return dict(self.db.execute("SELECT * FROM rules WHERE id=?", (cur.lastrowid,)).fetchone())
 
+    def update_rule(self, rule_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
+        current = self.db.execute("SELECT * FROM rules WHERE id=?", (rule_id,)).fetchone()
+        if current is None:
+            return None
+        self.db.execute(
+            "UPDATE rules SET channel=?, event_type=?, object_type=?, enabled=? WHERE id=?",
+            (
+                data.get("channel", current["channel"]),
+                data.get("event_type", current["event_type"]),
+                data.get("object_type", current["object_type"]),
+                int(bool(data.get("enabled", current["enabled"]))),
+                rule_id,
+            ),
+        )
+        self.db.commit()
+        return dict(self.db.execute("SELECT * FROM rules WHERE id=?", (rule_id,)).fetchone())
+
+    def delete_rule(self, rule_id: int) -> bool:
+        cur = self.db.execute("DELETE FROM rules WHERE id=?", (rule_id,))
+        self.db.commit()
+        return cur.rowcount > 0
+
+    def channels(self) -> list[dict[str, Any]]:
+        rows = self.db.execute(
+            "SELECT channel, COUNT(*) AS event_count, MAX(timestamp) AS last_event FROM events WHERE channel IS NOT NULL GROUP BY channel ORDER BY channel"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
 
 def _auth(request: web.Request) -> bool:
     expected = request.app["admin_password"]
@@ -153,6 +181,24 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         except (ValueError, json.JSONDecodeError) as exc:
             return web.json_response({"error": str(exc)}, status=400)
 
+    async def update_rule(request: web.Request) -> web.Response:
+        if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), app["csrf_token"]):
+            return web.json_response({"error": "csrf token required"}, status=403)
+        result = store.update_rule(int(request.match_info["id"]), await request.json())
+        return (
+            web.json_response(result)
+            if result
+            else web.json_response({"error": "not found"}, status=404)
+        )
+
+    async def delete_rule(request: web.Request) -> web.Response:
+        if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), app["csrf_token"]):
+            return web.json_response({"error": "csrf token required"}, status=403)
+        return web.json_response({"deleted": store.delete_rule(int(request.match_info["id"]))})
+
+    async def channels(_request: web.Request) -> web.Response:
+        return web.json_response(store.channels())
+
     async def live_events(_request: web.Request) -> web.StreamResponse:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=50)
         service.live_subscribers.add(queue)
@@ -176,5 +222,8 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app.router.add_get("/api/events", events)
     app.router.add_get("/api/notifications", rules)
     app.router.add_post("/api/notifications", create_rule)
+    app.router.add_patch("/api/notifications/{id}", update_rule)
+    app.router.add_delete("/api/notifications/{id}", delete_rule)
+    app.router.add_get("/api/channels", channels)
     app.router.add_get("/api/events/live", live_events)
     return app

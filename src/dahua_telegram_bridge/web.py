@@ -5,6 +5,7 @@ import hmac
 import json
 import secrets
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +150,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app["admin_username"] = getattr(config, "admin_username", "admin")
     app["session_token"] = secrets.token_urlsafe(32)
     app["csrf_token"] = secrets.token_urlsafe(24)
+    app["nvr_info"] = {"expires": 0.0, "data": {}}
 
     @web.middleware
     async def auth_middleware(request: web.Request, handler: Any) -> web.StreamResponse:
@@ -206,6 +208,14 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         )
 
     async def nvr(_request: web.Request) -> web.Response:
+        if time.monotonic() > app["nvr_info"]["expires"] and service.health.nvr_connected:
+            try:
+                app["nvr_info"] = {
+                    "expires": time.monotonic() + 60,
+                    "data": await service.dahua.system_info(),
+                }
+            except Exception:
+                app["nvr_info"] = {"expires": time.monotonic() + 10, "data": {}}
         return web.json_response(
             {
                 "host": config.dahua.host,
@@ -213,6 +223,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
                 "https": config.dahua.https,
                 "connected": service.health.nvr_connected,
                 "channel": config.dahua.channel,
+                "system_info": app["nvr_info"]["data"],
             }
         )
 

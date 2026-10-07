@@ -61,3 +61,15 @@ class DahuaClient:
         )
         response.raise_for_status()
         return response.content
+
+    async def system_info(self) -> dict[str, str]:
+        response = await self.client.get(
+            f"{self.config.base_url}/cgi-bin/magicBox.cgi", params={"action": "getSystemInfo"}
+        )
+        response.raise_for_status()
+        result: dict[str, str] = {}
+        for line in response.text.splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                result[key.strip()] = value.strip()
+        return result

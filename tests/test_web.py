@@ -86,6 +86,8 @@ async def test_admin_navigation_is_rendered_as_html(web_client):
     assert response.status == 200
     assert "<button data-tab=dashboard>Dashboard</button>" in body
     assert "${['dashboard'" not in body
+    assert "document.getElementById('cards')" in body
+    assert "document.getElementById('nvrdata')" in body
 
 
 @pytest.mark.asyncio

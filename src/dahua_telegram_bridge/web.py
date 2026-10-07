@@ -29,6 +29,11 @@ ADMIN_HTML = re.sub(
     count=1,
     flags=re.DOTALL,
 )
+ADMIN_HTML = ADMIN_HTML.replace(
+    "</main><script>const tabs=",
+    "</main><script>const cards=document.getElementById('cards'),nvrdata=document.getElementById('nvrdata'),chdata=document.getElementById('chdata'),evdata=document.getElementById('evdata'),rules=document.getElementById('rules'),logdata=document.getElementById('logdata'),settingsdata=document.getElementById('settingsdata'),sysdata=document.getElementById('sysdata');const tabs=",
+    1,
+)
 
 
 class Store:

@@ -37,6 +37,14 @@ ADMIN_HTML = ADMIN_HTML.replace(
 # Escape the newline separator for JavaScript, rather than embedding a literal
 # line break inside the quoted string.
 ADMIN_HTML = ADMIN_HTML.replace("join('\n')", "join('\\\\n')", 1)
+ADMIN_HTML = ADMIN_HTML.replace(
+    "<th>Rule</th></tr>", "<th>Rule</th><th>Decision</th><th>Reason</th></tr>", 1
+)
+ADMIN_HTML = ADMIN_HTML.replace(
+    "<td>${x.rule_name||''}</td></tr>`",
+    "<td>${x.rule_name||''}</td><td>${x.decision||''}</td><td>${x.reason||''}</td></tr>`",
+    1,
+)
 
 
 class Store:
@@ -45,16 +53,21 @@ class Store:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(
-            """CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,timestamp TEXT,event_type TEXT,action TEXT,channel INTEGER,object_type TEXT,rule_name TEXT,raw_payload TEXT); CREATE TABLE IF NOT EXISTS rules(id INTEGER PRIMARY KEY AUTOINCREMENT,channel INTEGER,event_type TEXT,object_type TEXT,enabled INTEGER NOT NULL DEFAULT 1); CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT,timestamp TEXT,source TEXT,setting TEXT,old_value TEXT,new_value TEXT,result TEXT);"""
+            """CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,timestamp TEXT,event_type TEXT,action TEXT,channel INTEGER,object_type TEXT,rule_name TEXT,raw_payload TEXT,decision TEXT,reason TEXT); CREATE TABLE IF NOT EXISTS rules(id INTEGER PRIMARY KEY AUTOINCREMENT,channel INTEGER,event_type TEXT,object_type TEXT,enabled INTEGER NOT NULL DEFAULT 1); CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT,timestamp TEXT,source TEXT,setting TEXT,old_value TEXT,new_value TEXT,result TEXT);"""
         )
+        for column in ("decision", "reason"):
+            try:
+                self.db.execute(f"ALTER TABLE events ADD COLUMN {column} TEXT")
+            except sqlite3.OperationalError:
+                pass
         self.db.commit()
 
     def close(self) -> None:
         self.db.close()
 
-    def add_event(self, event: Any) -> None:
+    def add_event(self, event: Any, decision: str = "processed", reason: str = "") -> None:
         self.db.execute(
-            "INSERT OR REPLACE INTO events VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO events VALUES(?,?,?,?,?,?,?,?,?,?)",
             (
                 event.id,
                 event.timestamp.isoformat(),
@@ -64,6 +77,8 @@ class Store:
                 event.object_type,
                 event.rule_name,
                 json.dumps(event.raw_payload),
+                decision,
+                reason,
             ),
         )
         self.db.commit()

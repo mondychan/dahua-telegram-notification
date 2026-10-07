@@ -68,15 +68,25 @@ class BridgeService:
     async def handle(self, event: Event) -> None:
         received = time.monotonic()
         self.health.events_received += 1
-        if not self._allowed(event):
+        allowed = self._allowed(event)
+        if self.store is not None:
+            reason = (
+                "allowed"
+                if allowed
+                else (
+                    "stop event disabled"
+                    if not event.is_start and not self.config.send_stop
+                    else "no matching event rule"
+                )
+            )
+            self.store.add_event(event, "eligible" if allowed else "filtered", reason)
+        if not allowed:
             self.health.events_filtered += 1
             return
         if self.config.dedup_enabled and self._duplicate(event):
             self.health.events_deduplicated += 1
             return
         timing = Timing(received)
-        if self.store is not None:
-            self.store.add_event(event)
         payload = {
             "id": event.id,
             "timestamp": event.timestamp.isoformat(),

@@ -28,6 +28,7 @@ async def web_client(tmp_path):
     async with TestServer(app) as server:
         async with TestClient(server) as client:
             yield client
+    app["store"].close()
 
 
 @pytest.mark.asyncio

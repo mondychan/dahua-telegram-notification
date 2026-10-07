@@ -91,3 +91,18 @@ async def test_persistent_rule_overrides_allowlist():
     assert event
     await service.handle(event)
     assert not t.calls
+
+
+@pytest.mark.asyncio
+async def test_live_subscriber_receives_normalized_event():
+    cfg = AppConfig(DahuaConfig("n"), TelegramConfig("token", "chat"), {"Human"})
+    service = BridgeService(cfg, FakeDahua(), FakeTelegram())
+    import asyncio
+
+    queue = asyncio.Queue()
+    service.live_subscribers.add(queue)
+    event = parse_event("Code=Human;action=Start;index=0;ObjectType=Human")
+    assert event
+    await service.handle(event)
+    payload = await queue.get()
+    assert payload["event_type"] == "Human" and payload["action"] == "Start"

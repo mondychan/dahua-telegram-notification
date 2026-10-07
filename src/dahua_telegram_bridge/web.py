@@ -29,6 +29,9 @@ class Store:
         )
         self.db.commit()
 
+    def close(self) -> None:
+        self.db.close()
+
     def add_event(self, event: Any) -> None:
         self.db.execute(
             "INSERT OR REPLACE INTO events VALUES(?,?,?,?,?,?,?,?)",

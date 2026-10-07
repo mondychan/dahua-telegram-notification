@@ -43,6 +43,8 @@ async def web_client(tmp_path):
 async def test_web_requires_auth(web_client):
     response = await web_client.get("/api/system")
     assert response.status == 401
+    for path in ("/api/config", "/api/events", "/api/channels", "/api/logs"):
+        assert (await web_client.get(path)).status == 401
 
 
 @pytest.mark.asyncio

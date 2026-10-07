@@ -43,3 +43,11 @@ def test_parse_real_smart_motion_vehicle_payload():
     assert event and event.event_type == "SmartMotionVehicle"
     assert event.object_type == "Vehicle"
     assert event.channel == 4 and event.rule_name == "IPC"
+
+
+def test_parse_real_smart_motion_human_payload():
+    payload = open("tests/fixtures/dahua/smart_motion_human.txt", encoding="utf-8").read()
+    event = parse_event(payload)
+    assert event and event.event_type == "SmartMotionHuman"
+    assert event.object_type == "Human"
+    assert event.channel == 4 and event.rule_name == "IPC"

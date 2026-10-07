@@ -1,0 +1,6 @@
+Code=SmartMotionHuman;action=Start;index=4;data={
+  "LocaleTime" : "2026-10-07 14:50:53",
+  "Name" : "IPC",
+  "RealUTC" : 1791377452,
+  "UTC" : 1791381053
+}

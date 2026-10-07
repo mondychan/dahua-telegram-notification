@@ -16,3 +16,16 @@ def test_malformed_is_ignored():
 def test_parse_nested_dahua_data():
     event = parse_event('Code=RecordDelete;action=Pulse;index=0;data={"Channel": 6, "Type": 0}')
     assert event and event.channel == 6
+
+
+def test_parse_real_video_motion_payload():
+    payload = """Code=VideoMotion;action=Start;index=2;data={
+   "LocaleTime" : "2026-10-07 13:26:48",
+   "Name" : "zahrada",
+   "WithSnap" : true
+}
+"""
+    event = parse_event(payload)
+    assert event and event.channel == 2
+    assert event.rule_name == "zahrada"
+    assert event.timestamp.strftime("%Y-%m-%d %H:%M:%S") == "2026-10-07 13:26:48"

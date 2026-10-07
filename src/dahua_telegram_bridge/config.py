@@ -139,3 +139,5 @@ def validate_config(config: AppConfig) -> None:
         raise ValueError(
             "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required when Telegram is enabled"
         )
+    if not config.admin_password:
+        raise ValueError("ADMIN_PASSWORD is required for web administration")

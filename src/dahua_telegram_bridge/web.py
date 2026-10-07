@@ -88,7 +88,9 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
 
     @web.middleware
     async def auth_middleware(request: web.Request, handler: Any) -> web.StreamResponse:
-        if request.path in {"/", "/login"} or request.path.startswith("/static"):
+        if request.path in {"/", "/login", "/health", "/metrics"} or request.path.startswith(
+            "/static"
+        ):
             return await handler(request)  # type: ignore[no-any-return]
         if not _auth(request):
             return web.json_response({"error": "authentication required"}, status=401)

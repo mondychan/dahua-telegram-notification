@@ -1,6 +1,6 @@
 services:
   dahua-telegram-bridge:
-    image: ghcr.io/mondychan/dahua-telegram-notification:latest
+    image: ${IMAGE:-ghcr.io/mondychan/dahua-telegram-notification:latest}
     env_file: .env
     restart: unless-stopped
     ports: ["8080:8080"]

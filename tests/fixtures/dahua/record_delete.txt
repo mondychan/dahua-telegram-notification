@@ -1,0 +1,6 @@
+Code=RecordDelete;action=Pulse;index=0;data={
+  "Channel": 6,
+  "EndTime": "2026-09-20 09:34:18",
+  "RealUTC": 1791369071,
+  "Type": 0
+}

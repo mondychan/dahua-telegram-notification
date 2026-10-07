@@ -34,6 +34,29 @@ class HealthState:
     snapshots_failed: int = 0
     telegram_sent: int = 0
     telegram_failed: int = 0
+    events_received: int = 0
+    events_filtered: int = 0
+    events_deduplicated: int = 0
+    last_snapshot: datetime | None = None
+
+
+@dataclass(slots=True)
+class Timing:
+    event_received: float
+    snapshot_started: float | None = None
+    snapshot_received: float | None = None
+    telegram_started: float | None = None
+    telegram_sent: float | None = None
+
+    def durations_ms(self) -> dict[str, int | None]:
+        def delta(end: float | None, start: float | None) -> int | None:
+            return round((end - start) * 1000) if end is not None and start is not None else None
+
+        return {
+            "event_to_snapshot": delta(self.snapshot_received, self.event_received),
+            "snapshot_to_telegram": delta(self.telegram_sent, self.snapshot_received),
+            "total": delta(self.telegram_sent, self.event_received),
+        }
 
 
 def utcnow() -> datetime:

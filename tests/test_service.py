@@ -2,6 +2,7 @@ import pytest
 from dahua_telegram_bridge.config import AppConfig, DahuaConfig, TelegramConfig
 from dahua_telegram_bridge.dahua.parser import parse_event
 from dahua_telegram_bridge.service import BridgeService
+from dahua_telegram_bridge.models import Timing
 
 
 class FakeDahua:
@@ -42,3 +43,32 @@ async def test_stop_is_ignored():
     assert event
     await service.handle(event)
     assert not t.calls
+
+
+def test_timing_durations():
+    timing = Timing(1.0, 1.074, 1.100, 1.101, 1.218)
+    assert timing.durations_ms() == {
+        "event_to_snapshot": 100,
+        "snapshot_to_telegram": 118,
+        "total": 218,
+    }
+
+
+@pytest.mark.asyncio
+async def test_dedup_distinguishes_objects_and_ttl(monkeypatch):
+    cfg = AppConfig(
+        DahuaConfig("n"), TelegramConfig("token", "chat"), {"Human"}, dedup_ttl_seconds=2
+    )
+    d, t = FakeDahua(), FakeTelegram()
+    service = BridgeService(cfg, d, t)
+    first = parse_event("Code=Human\naction=Start\nindex=1\nObjectType=Human")
+    second = parse_event("Code=Human\naction=Start\nindex=1\nObjectType=Vehicle")
+    assert first and second
+    second.timestamp = first.timestamp
+    await service.handle(first)
+    await service.handle(first)
+    await service.handle(second)
+    assert len(t.calls) == 2
+    service._seen.clear()
+    await service.handle(first)
+    assert len(t.calls) == 3

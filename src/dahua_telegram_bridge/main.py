@@ -32,6 +32,9 @@ async def run(config_path: str | None = None) -> None:
                 "last_telegram": service.health.last_telegram.isoformat()
                 if service.health.last_telegram
                 else None,
+                "last_snapshot": service.health.last_snapshot.isoformat()
+                if service.health.last_snapshot
+                else None,
                 "reconnect_count": service.health.reconnect_count,
                 "processed_events": service.health.processed_events,
                 "failed_events": service.health.failed_events,
@@ -47,7 +50,10 @@ async def run(config_path: str | None = None) -> None:
     async def metrics(_request: web.Request) -> web.Response:
         h = service.health
         values = {
+            "events_received_total": h.events_received,
             "events_processed_total": h.processed_events,
+            "events_filtered_total": h.events_filtered,
+            "events_deduplicated_total": h.events_deduplicated,
             "events_failed_total": h.failed_events,
             "snapshots_success_total": h.snapshots_success,
             "snapshots_failed_total": h.snapshots_failed,

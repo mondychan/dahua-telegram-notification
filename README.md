@@ -17,3 +17,5 @@ Set `TELEGRAM_ENABLED=false` for a dry run. The service logs the notification de
 The production compose and deployment helper are in `deploy/`. They pull `ghcr.io/mondychan/dahua-telegram-notification:latest`, run as a restricted container, enforce a healthcheck, memory/CPU limits, and JSON log rotation. Real-NVR integration tests are under `tests/integration/` and require `DAHUA_INTEGRATION=1`; they never require Telegram.
 
 CI runs Ruff, mypy, pytest, coverage, and Docker build on pushes and pull requests. A push to `main` publishes the container to GHCR; version tags `vX.Y.Z` are also supported by the release workflow.
+
+Current validation status: the real NVR stream and direct JPEG snapshot are verified, while CrossLineDetection and Human/SMD still require a manually triggered camera event. The `snapManager.cgi` endpoint returned HTTP 200 but produced no event/JPEG during the observation window. Local tests cover parser, filtering, deduplication, timing, dry-run, and Telegram retry behavior; NVR event HTTP integration remains mock/integration-only.

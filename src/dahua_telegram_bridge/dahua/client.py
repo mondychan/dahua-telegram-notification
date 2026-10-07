@@ -13,7 +13,11 @@ log = logging.getLogger(__name__)
 class DahuaClient:
     def __init__(self, config: Any) -> None:
         self.config = config
-        self.client = httpx.AsyncClient(auth=httpx.DigestAuth(config.username, config.password), timeout=config.timeout_seconds, verify=False)
+        self.client = httpx.AsyncClient(
+            auth=httpx.DigestAuth(config.username, config.password),
+            timeout=config.timeout_seconds,
+            verify=False,
+        )
 
     async def close(self) -> None:
         await self.client.aclose()
@@ -39,17 +43,21 @@ class DahuaClient:
                             length = int(line.split(":", 1)[1].strip())
                             break
                     if length is None:
-                        buffer = buffer[separator + 4:]
+                        buffer = buffer[separator + 4 :]
                         continue
                     start = separator + 4
                     if len(buffer) < start + length:
                         break
-                    body = buffer[start:start + length]
-                    buffer = buffer[start + length:]
+                    body = buffer[start : start + length]
+                    buffer = buffer[start + length :]
                     if body.strip().lower() != b"heartbeat":
                         yield body
 
     async def snapshot(self, channel: int, timeout_ms: int) -> bytes:
-        response = await self.client.get(f"{self.config.base_url}/cgi-bin/snapshot.cgi", params={"channel": channel}, timeout=timeout_ms / 1000)
+        response = await self.client.get(
+            f"{self.config.base_url}/cgi-bin/snapshot.cgi",
+            params={"channel": channel},
+            timeout=timeout_ms / 1000,
+        )
         response.raise_for_status()
         return response.content

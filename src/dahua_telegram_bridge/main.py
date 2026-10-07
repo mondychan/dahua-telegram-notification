@@ -4,7 +4,7 @@ import asyncio
 import logging
 from aiohttp import web
 
-from .config import load_config
+from .config import load_config, validate_config
 from .dahua.client import DahuaClient
 from .service import BridgeService
 from .telegram.client import TelegramClient
@@ -12,14 +12,55 @@ from .telegram.client import TelegramClient
 
 async def run(config_path: str | None = None) -> None:
     config = load_config(config_path)
-    logging.basicConfig(level=getattr(logging, config.log_level.upper(), logging.INFO), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    validate_config(config)
+    logging.basicConfig(
+        level=getattr(logging, config.log_level.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
     dahua, telegram = DahuaClient(config.dahua), TelegramClient(config.telegram)
     service = BridgeService(config, dahua, telegram)
     app = web.Application()
+
     async def health(_request: web.Request) -> web.Response:
-        return web.json_response({"alive": True, "nvr_connected": service.health.nvr_connected, "last_event": service.health.last_event.isoformat() if service.health.last_event else None, "last_telegram": service.health.last_telegram.isoformat() if service.health.last_telegram else None, "reconnect_count": service.health.reconnect_count})
+        return web.json_response(
+            {
+                "alive": True,
+                "nvr_connected": service.health.nvr_connected,
+                "last_event": service.health.last_event.isoformat()
+                if service.health.last_event
+                else None,
+                "last_telegram": service.health.last_telegram.isoformat()
+                if service.health.last_telegram
+                else None,
+                "reconnect_count": service.health.reconnect_count,
+                "processed_events": service.health.processed_events,
+                "failed_events": service.health.failed_events,
+                "snapshots_success": service.health.snapshots_success,
+                "snapshots_failed": service.health.snapshots_failed,
+                "telegram_sent": service.health.telegram_sent,
+                "telegram_failed": service.health.telegram_failed,
+            }
+        )
 
     app.router.add_get("/health", health)
+
+    async def metrics(_request: web.Request) -> web.Response:
+        h = service.health
+        values = {
+            "events_processed_total": h.processed_events,
+            "events_failed_total": h.failed_events,
+            "snapshots_success_total": h.snapshots_success,
+            "snapshots_failed_total": h.snapshots_failed,
+            "telegram_sent_total": h.telegram_sent,
+            "telegram_failed_total": h.telegram_failed,
+            "nvr_reconnect_total": h.reconnect_count,
+        }
+        return web.Response(
+            text="\n".join(f"{key} {value}" for key, value in values.items()) + "\n",
+            content_type="text/plain",
+        )
+
+    app.router.add_get("/metrics", metrics)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, config.health_host, config.health_port).start()

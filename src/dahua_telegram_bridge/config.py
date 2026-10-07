@@ -40,6 +40,9 @@ class TelegramConfig:
     bot_token: str
     chat_id: str
     timeout_seconds: float = 10.0
+    enabled: bool = True
+    max_retries: int = 3
+    backoff_seconds: float = 1.0
 
 
 @dataclass(slots=True)
@@ -57,6 +60,7 @@ class AppConfig:
     log_level: str = "INFO"
     health_host: str = "0.0.0.0"
     health_port: int = 8080
+    snapshot_mode: str = "auto"
 
 
 def load_config(path: str | None = None) -> AppConfig:
@@ -70,7 +74,43 @@ def load_config(path: str | None = None) -> AppConfig:
     dedup = raw.get("dedup", {})
     logging = raw.get("logging", {})
     return AppConfig(
-        dahua=DahuaConfig(host=d.get("host", os.getenv("DAHUA_HOST", "127.0.0.1")), port=int(d.get("port", os.getenv("DAHUA_PORT", 80))), username=d.get("username", os.getenv("DAHUA_USERNAME", "admin")), password=d.get("password", os.getenv("DAHUA_PASSWORD", "")), channel=int(d.get("channel", os.getenv("DAHUA_CHANNEL", 1))), https=bool(d.get("https", False)), stream=d.get("stream", "event"), timeout_seconds=float(d.get("timeout_seconds", 10))),
-        telegram=TelegramConfig(bot_token=t.get("bot_token", os.getenv("TELEGRAM_BOT_TOKEN", "")), chat_id=str(t.get("chat_id", os.getenv("TELEGRAM_CHAT_ID", ""))), timeout_seconds=float(t.get("timeout_seconds", 10))),
-        enabled_events=set(e.get("enabled", ["CrossLineDetection", "Human", "SMD"])), snapshot_enabled=bool(s.get("enabled", True)), snapshot_timeout_ms=int(s.get("timeout_ms", 1000)), dedup_enabled=bool(dedup.get("enabled", True)), dedup_ttl_seconds=float(dedup.get("ttl_seconds", 2)), send_stop=bool(e.get("send_stop", False)), camera_name=raw.get("camera_name", "Dahua camera"), event_names=raw.get("names", {}), log_level=logging.get("level", "INFO"), health_host=raw.get("health", {}).get("host", "0.0.0.0"), health_port=int(raw.get("health", {}).get("port", 8080)),
+        dahua=DahuaConfig(
+            host=d.get("host", os.getenv("DAHUA_HOST", "127.0.0.1")),
+            port=int(d.get("port", os.getenv("DAHUA_PORT", 80))),
+            username=d.get("username", os.getenv("DAHUA_USERNAME", "admin")),
+            password=d.get("password", os.getenv("DAHUA_PASSWORD", "")),
+            channel=int(d.get("channel", os.getenv("DAHUA_CHANNEL", 1))),
+            https=bool(d.get("https", False)),
+            stream=d.get("stream", os.getenv("DAHUA_STREAM", "event")),
+            timeout_seconds=float(d.get("timeout_seconds", 10)),
+        ),
+        telegram=TelegramConfig(
+            bot_token=t.get("bot_token", os.getenv("TELEGRAM_BOT_TOKEN", "")),
+            chat_id=str(t.get("chat_id", os.getenv("TELEGRAM_CHAT_ID", ""))),
+            timeout_seconds=float(t.get("timeout_seconds", 10)),
+            enabled=os.getenv("TELEGRAM_ENABLED", "true").lower() == "true",
+            max_retries=int(t.get("max_retries", 3)),
+            backoff_seconds=float(t.get("backoff_seconds", 1)),
+        ),
+        enabled_events=set(e.get("enabled", ["CrossLineDetection", "Human", "SMD"])),
+        snapshot_enabled=bool(s.get("enabled", True)),
+        snapshot_timeout_ms=int(s.get("timeout_ms", 1000)),
+        dedup_enabled=bool(dedup.get("enabled", True)),
+        dedup_ttl_seconds=float(dedup.get("ttl_seconds", 2)),
+        send_stop=bool(e.get("send_stop", False)),
+        camera_name=raw.get("camera_name", "Dahua camera"),
+        event_names=raw.get("names", {}),
+        log_level=logging.get("level", "INFO"),
+        health_host=raw.get("health", {}).get("host", "0.0.0.0"),
+        health_port=int(raw.get("health", {}).get("port", 8080)),
+        snapshot_mode=raw.get("snapshot_mode", os.getenv("SNAPSHOT_MODE", "auto")),
     )
+
+
+def validate_config(config: AppConfig) -> None:
+    if not config.dahua.host or config.dahua.host == "127.0.0.1":
+        raise ValueError("DAHUA_HOST is required")
+    if config.telegram.enabled and (not config.telegram.bot_token or not config.telegram.chat_id):
+        raise ValueError(
+            "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required when Telegram is enabled"
+        )

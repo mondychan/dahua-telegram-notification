@@ -28,6 +28,12 @@ class HealthState:
     last_event: datetime | None = None
     last_telegram: datetime | None = None
     reconnect_count: int = 0
+    processed_events: int = 0
+    failed_events: int = 0
+    snapshots_success: int = 0
+    snapshots_failed: int = 0
+    telegram_sent: int = 0
+    telegram_failed: int = 0
 
 
 def utcnow() -> datetime:

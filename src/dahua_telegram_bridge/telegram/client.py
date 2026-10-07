@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-import httpx
+import asyncio
+import logging
 from typing import Any
+
+import httpx
 
 
 class TelegramClient:
@@ -13,9 +16,41 @@ class TelegramClient:
         await self.client.aclose()
 
     async def send(self, caption: str, photo: bytes | None = None) -> None:
-        url = f"https://api.telegram.org/bot{self.config.bot_token}/sendPhoto" if photo else f"https://api.telegram.org/bot{self.config.bot_token}/sendMessage"
-        if photo:
-            response = await self.client.post(url, data={"chat_id": self.config.chat_id, "caption": caption}, files={"photo": ("snapshot.jpg", photo, "image/jpeg")})
-        else:
-            response = await self.client.post(url, data={"chat_id": self.config.chat_id, "text": caption})
-        response.raise_for_status()
+        if not self.config.enabled:
+            logging.getLogger(__name__).info("dry-run telegram send photo=%s", bool(photo))
+            return
+        url = (
+            f"https://api.telegram.org/bot{self.config.bot_token}/sendPhoto"
+            if photo
+            else f"https://api.telegram.org/bot{self.config.bot_token}/sendMessage"
+        )
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                if photo:
+                    response = await self.client.post(
+                        url,
+                        data={"chat_id": self.config.chat_id, "caption": caption},
+                        files={"photo": ("snapshot.jpg", photo, "image/jpeg")},
+                    )
+                else:
+                    response = await self.client.post(
+                        url, data={"chat_id": self.config.chat_id, "text": caption}
+                    )
+                if response.status_code == 429 and attempt < self.config.max_retries:
+                    await asyncio.sleep(
+                        float(
+                            response.headers.get(
+                                "retry-after", self.config.backoff_seconds * (2**attempt)
+                            )
+                        )
+                    )
+                    continue
+                if response.status_code >= 500 and attempt < self.config.max_retries:
+                    await asyncio.sleep(self.config.backoff_seconds * (2**attempt))
+                    continue
+                response.raise_for_status()
+                return
+            except (httpx.TimeoutException, httpx.NetworkError):
+                if attempt >= self.config.max_retries:
+                    raise
+                await asyncio.sleep(self.config.backoff_seconds * (2**attempt))

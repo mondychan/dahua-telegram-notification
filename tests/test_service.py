@@ -3,15 +3,23 @@ from dahua_telegram_bridge.config import AppConfig, DahuaConfig, TelegramConfig
 from dahua_telegram_bridge.dahua.parser import parse_event
 from dahua_telegram_bridge.service import BridgeService
 
+
 class FakeDahua:
     def __init__(self):
         self.calls = 0
+
     async def snapshot(self, channel, timeout_ms):
         self.calls += 1
         return b"jpg"
+
+
 class FakeTelegram:
-    def __init__(self): self.calls = []
-    async def send(self, caption, photo=None): self.calls.append((caption, photo))
+    def __init__(self):
+        self.calls = []
+
+    async def send(self, caption, photo=None):
+        self.calls.append((caption, photo))
+
 
 @pytest.mark.asyncio
 async def test_start_snapshot_and_dedup():
@@ -23,6 +31,7 @@ async def test_start_snapshot_and_dedup():
     await service.handle(event)
     await service.handle(event)
     assert len(t.calls) == 1 and d.calls == 1
+
 
 @pytest.mark.asyncio
 async def test_stop_is_ignored():

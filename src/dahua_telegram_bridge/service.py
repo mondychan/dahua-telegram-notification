@@ -19,11 +19,17 @@ class BridgeService:
     def _allowed(self, event: Event) -> bool:
         if not self.config.send_stop and not event.is_start:
             return False
-        return bool(not self.config.enabled_events or event.event_type in self.config.enabled_events or (event.object_type and event.object_type in self.config.enabled_events))
+        return bool(
+            not self.config.enabled_events
+            or event.event_type in self.config.enabled_events
+            or (event.object_type and event.object_type in self.config.enabled_events)
+        )
 
     def _duplicate(self, event: Event) -> bool:
         now = time.monotonic()
-        self._seen = {k: v for k, v in self._seen.items() if now - v < self.config.dedup_ttl_seconds}
+        self._seen = {
+            k: v for k, v in self._seen.items() if now - v < self.config.dedup_ttl_seconds
+        }
         key = f"{event.event_type}|{event.channel}|{event.rule_name}|{event.object_type}|{event.timestamp.timestamp():.0f}"
         if key in self._seen:
             return True
@@ -33,7 +39,12 @@ class BridgeService:
     def caption(self, event: Event) -> str:
         name = self.config.event_names.get(event.event_type, event.event_type)
         obj = event.object_type or ""
-        lines = ["Dahua event", f"Camera: {self.config.camera_name}", f"Event: {name}", f"Time: {event.display_timestamp}"]
+        lines = [
+            "Dahua event",
+            f"Camera: {self.config.camera_name}",
+            f"Event: {name}",
+            f"Time: {event.display_timestamp}",
+        ]
         if event.channel is not None:
             lines.insert(2, f"Channel: {event.channel}")
         if obj:
@@ -44,16 +55,24 @@ class BridgeService:
         if not self._allowed(event) or (self.config.dedup_enabled and self._duplicate(event)):
             return
         self.health.last_event = utcnow()
+        self.health.processed_events += 1
         photo = None
         if self.config.snapshot_enabled:
             try:
-                photo = await self.dahua.snapshot(event.channel or self.config.dahua.channel, self.config.snapshot_timeout_ms)
+                photo = await self.dahua.snapshot(
+                    event.channel or self.config.dahua.channel, self.config.snapshot_timeout_ms
+                )
+                self.health.snapshots_success += 1
             except Exception as exc:
+                self.health.snapshots_failed += 1
                 log.warning("snapshot failed: %s", exc)
         try:
             await self.telegram.send(self.caption(event), photo)
             self.health.last_telegram = utcnow()
+            self.health.telegram_sent += 1
         except Exception:
+            self.health.telegram_failed += 1
+            self.health.failed_events += 1
             log.exception("telegram request failed")
 
     async def run(self) -> None:
@@ -63,6 +82,7 @@ class BridgeService:
                 self.health.nvr_connected = True
                 async for raw in self.dahua.events():
                     from .dahua.parser import parse_event
+
                     event = parse_event(raw)
                     if event:
                         await self.handle(event)

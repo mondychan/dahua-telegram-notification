@@ -19,7 +19,7 @@ def parse_event(payload: str | bytes) -> Event | None:
     data_start = text.find("data={")
     if data_start >= 0:
         try:
-            nested = json.loads(text[data_start + 5:])
+            nested = json.loads(text[data_start + 5 :])
         except json.JSONDecodeError:
             nested = {}
     event_type = payload_value(fields, "Code", "code", "event", "Event")
@@ -29,7 +29,11 @@ def parse_event(payload: str | bytes) -> Event | None:
         event_type = match.group(1) if match else None
     if not event_type:
         return None
-    channel_raw = payload_value(fields, "channel", "Channel", "chn") or str(nested.get("Channel", "")) or payload_value(fields, "index")
+    channel_raw = (
+        payload_value(fields, "channel", "Channel", "chn")
+        or str(nested.get("Channel", ""))
+        or payload_value(fields, "index")
+    )
     try:
         channel = int(channel_raw) if channel_raw is not None else None
     except ValueError:
@@ -43,7 +47,9 @@ def parse_event(payload: str | bytes) -> Event | None:
                 break
             except ValueError:
                 continue
-    object_type = payload_value(fields, "ObjectType", "object", "Object", "type") or (str(nested["ObjectType"]) if "ObjectType" in nested else None)
+    object_type = payload_value(fields, "ObjectType", "object", "Object", "type") or (
+        str(nested["ObjectType"]) if "ObjectType" in nested else None
+    )
     rule = payload_value(fields, "Name", "Rule", "rule", "EventName")
     fingerprint = hashlib.sha1(text.encode(), usedforsecurity=False).hexdigest()[:16]
     return Event(fingerprint, timestamp, event_type, action, channel, object_type, rule, fields)

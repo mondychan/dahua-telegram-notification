@@ -9,7 +9,15 @@ from dahua_telegram_bridge.web import Store, create_web_app
 
 @pytest.fixture
 async def web_client(tmp_path):
-    service = SimpleNamespace(health=HealthState())
+    class Dahua:
+        async def system_info(self):
+            return {"deviceType": "31"}
+
+        async def channel_titles(self):
+            return {"table.ChannelTitle[0].Name": "gate"}
+
+    health = HealthState(nvr_connected=True)
+    service = SimpleNamespace(health=health, dahua=Dahua(), snapshot_cache={})
     config = SimpleNamespace(
         dahua=SimpleNamespace(host="nvr", port=80, username="admin", channel=1, https=False),
         telegram=SimpleNamespace(enabled=False, bot_token="", chat_id=""),
@@ -73,3 +81,13 @@ async def test_event_filtering(web_client):
     assert (await web_client.get("/api/events?event_type=Human")).status == 200
     assert (await web_client.get("/api/nvr")).status == 200
     assert (await web_client.get("/api/audit")).status == 200
+
+
+@pytest.mark.asyncio
+async def test_nvr_discovery_and_snapshot_not_found(web_client):
+    response = await web_client.post("/login", json={"username": "admin", "password": "secret"})
+    assert response.status == 200
+    nvr = await web_client.get("/api/nvr")
+    assert nvr.status == 200
+    assert (await nvr.json())["system_info"]["deviceType"] == "31"
+    assert (await web_client.get("/api/events/missing/snapshot")).status == 404

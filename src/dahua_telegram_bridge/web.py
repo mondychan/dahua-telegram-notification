@@ -262,6 +262,14 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
             else web.json_response({"error": "not found"}, status=404)
         )
 
+    async def snapshot(request: web.Request) -> web.Response:
+        data = service.snapshot_cache.get(request.match_info["id"])
+        return (
+            web.Response(body=data, content_type="image/jpeg")
+            if data
+            else web.json_response({"error": "not found"}, status=404)
+        )
+
     async def rules(_request: web.Request) -> web.Response:
         return web.json_response(store.rules())
 
@@ -318,6 +326,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app.router.add_get("/api/config", config_view)
     app.router.add_get("/api/events", events)
     app.router.add_get("/api/events/{id}", event_detail)
+    app.router.add_get("/api/events/{id}/snapshot", snapshot)
     app.router.add_get("/api/notifications", rules)
     app.router.add_post("/api/notifications", create_rule)
     app.router.add_patch("/api/notifications/{id}", update_rule)

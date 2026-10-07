@@ -17,6 +17,8 @@ class BridgeService:
         self._seen: dict[str, float] = {}
         self.store: Any = None
         self.live_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+        self.snapshot_cache: dict[str, bytes] = {}
+        self.snapshot_cache_limit = 10
 
     def _allowed(self, event: Event) -> bool:
         if self.store is not None:
@@ -99,6 +101,9 @@ class BridgeService:
                     else self.config.dahua.channel
                 )
                 photo = await self.dahua.snapshot(snapshot_channel, self.config.snapshot_timeout_ms)
+                self.snapshot_cache[event.id] = photo
+                while len(self.snapshot_cache) > self.snapshot_cache_limit:
+                    self.snapshot_cache.pop(next(iter(self.snapshot_cache)))
                 timing.snapshot_received = time.monotonic()
                 self.health.snapshots_success += 1
                 self.health.last_snapshot = utcnow()

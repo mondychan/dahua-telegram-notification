@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 import logging
+import re
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
-
 
 log = logging.getLogger(__name__)
 
@@ -32,26 +32,63 @@ class DahuaClient:
             async for chunk in response.aiter_bytes():
                 buffer += chunk
                 while True:
-                    separator = buffer.find(b"\r\n\r\n")
-                    if separator < 0:
+                    sep_rn = buffer.find(b"\r\n\r\n")
+                    sep_n = buffer.find(b"\n\n")
+                    if sep_rn >= 0 and (sep_n < 0 or sep_rn <= sep_n):
+                        separator = sep_rn
+                        sep_len = 4
+                    elif sep_n >= 0:
+                        separator = sep_n
+                        sep_len = 2
+                    else:
                         break
+
                     headers = buffer[:separator].decode("latin1", "replace")
                     marker = "content-length:"
                     length = None
                     for line in headers.splitlines():
                         if line.lower().startswith(marker):
-                            length = int(line.split(":", 1)[1].strip())
+                            try:
+                                length = int(line.split(":", 1)[1].strip())
+                            except ValueError:
+                                length = None
                             break
-                    if length is None:
-                        buffer = buffer[separator + 4 :]
+
+                    if length is not None:
+                        start = separator + sep_len
+                        if len(buffer) < start + length:
+                            break
+                        body = buffer[start : start + length]
+                        buffer = buffer[start + length :]
+                        stripped = body.strip()
+                        if stripped and stripped.lower() != b"heartbeat":
+                            yield body
                         continue
-                    start = separator + 4
-                    if len(buffer) < start + length:
-                        break
-                    body = buffer[start : start + length]
-                    buffer = buffer[start + length :]
-                    if body.strip().lower() != b"heartbeat":
-                        yield body
+
+                    # If no Content-Length header, check for multipart boundary
+                    boundary_match = re.search(r"--([A-Za-z0-9_.-]+)", headers)
+                    if boundary_match:
+                        b_marker = b"--" + boundary_match.group(1).encode("ascii")
+                        next_b = buffer.find(b_marker, separator + sep_len)
+                        if next_b >= 0:
+                            body = buffer[separator + sep_len : next_b].strip()
+                            buffer = buffer[next_b:]
+                            if body and body.lower() != b"heartbeat":
+                                yield body
+                            continue
+                        else:
+                            # Wait for more data to reach next boundary
+                            break
+
+                    # If headers themselves contain Code=, yield it as body
+                    if b"code=" in headers.lower().encode("latin1"):
+                        body = buffer[:separator].strip()
+                        buffer = buffer[separator + sep_len :]
+                        if body and body.lower() != b"heartbeat":
+                            yield body
+                        continue
+
+                    buffer = buffer[separator + sep_len :]
 
     async def snapshot(self, channel: int, timeout_ms: int) -> bytes:
         response = await self.client.get(

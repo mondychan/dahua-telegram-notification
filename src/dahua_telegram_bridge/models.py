@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 
 
 @dataclass(slots=True)
@@ -11,7 +14,33 @@ class Event:
     channel: int | None = None
     object_type: str | None = None
     rule_name: str | None = None
-    raw_payload: dict[str, str] = field(default_factory=dict)
+    raw_payload: dict[str, Any] = field(default_factory=dict)
+    raw_index: int | None = None
+    camera_name: str | None = None
+    object_id: int | str | None = None
+    direction: str | None = None
+    event_id: int | None = None
+    group_id: int | None = None
+    with_snap: bool | None = None
+    data: dict[str, Any] = field(default_factory=dict)
+    processing_status: str = "received"
+    filter_reason: str | None = None
+    snapshot_status: str | None = None
+    notification_status: str | None = None
+    latency_metrics: dict[str, Any] | None = None
+    channel_mapping_source: str | None = None
+
+    @property
+    def channel_number(self) -> int | None:
+        return self.channel
+
+    @property
+    def decision(self) -> str:
+        return self.processing_status
+
+    @property
+    def reason(self) -> str | None:
+        return self.filter_reason
 
     @property
     def is_start(self) -> bool:
@@ -63,8 +92,8 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def payload_value(payload: dict[str, str], *keys: str) -> str | None:
+def payload_value(payload: dict[str, Any], *keys: str) -> str | None:
     for key in keys:
-        if key in payload:
-            return payload[key]
+        if key in payload and payload[key] is not None:
+            return str(payload[key])
     return None

@@ -1,0 +1,11 @@
+Code=SmartMotionVehicle;action=Start;index=0;data={
+  "EventID": 3654275,
+  "LocaleTime": "2026-10-08 09:43:39",
+  "WithSnap": true,
+  "object": [
+    {
+      "Rect": [4632, 1464, 6872, 3592],
+      "VehicleID": 768523
+    }
+  ]
+}

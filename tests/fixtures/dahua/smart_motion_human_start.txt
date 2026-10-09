@@ -1,0 +1,11 @@
+Code=SmartMotionHuman;action=Start;index=0;data={
+  "EventID": 3767606,
+  "LocaleTime": "2026-10-08 09:43:38",
+  "WithSnap": true,
+  "object": [
+    {
+      "HumamID": 5598,
+      "Rect": [7352, 3112, 7544, 4024]
+    }
+  ]
+}

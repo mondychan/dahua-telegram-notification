@@ -1,0 +1,6 @@
+Code=VideoMotion;action=Stop;index=2;data={
+  "LocaleTime" : "2026-10-07 13:27:00",
+  "Name" : "zahrada",
+  "SmartMotionEnable" : true,
+  "WithSnap" : false
+}

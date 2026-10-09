@@ -1,0 +1,2 @@
+garbage content without key value pairs or JSON
+Code=MalformedNoJson;action=Start;index=99;data={broken json

@@ -1,0 +1,14 @@
+Code=CrossLineDetection;action=Stop;index=0;data={
+    "Direction": "RightToLeft",
+    "EventID": 10033,
+    "GroupID": 32,
+    "LocaleTime": "2026-10-08 09:43:40",
+    "Name": "Rule1",
+    "Object": {
+        "Action": "Disappear",
+        "ObjectID": 4185,
+        "ObjectType": "Vehicle"
+    },
+    "RuleID": 7,
+    "WithSnap": false
+}

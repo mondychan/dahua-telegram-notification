@@ -5,6 +5,7 @@ COPY pyproject.toml ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 RUN useradd --create-home --uid 10001 appuser
+RUN mkdir -p /data && chown -R appuser:appuser /data
 USER appuser
 EXPOSE 8080
 VOLUME ["/data"]

@@ -1,21 +1,52 @@
 # Dahua Telegram Bridge
 
-Persistentní bridge pro Dahua NVR event stream a Telegram Bot API. Používá `eventManager.cgi` (volitelně `snapManager.cgi`), po eventu ihned zkusí snapshot a odešle `sendPhoto`; při chybě snapshotu odešle text.
+Persistentní bridge pro Dahua NVR event stream a Telegram Bot API. Používá `eventManager.cgi`, okamžitě po příchodu události vyhodnocuje pravidla, stahuje snapshot ze `snapshot.cgi` a odesílá `sendPhoto`; při výpadku snapshotu bezpečně odesílá textový fallback.
 
-Zkopírujte `.env.example` do `.env`, vyplňte údaje a spusťte `docker compose up -d --build`. Health endpoint je `GET /health`. Lokálně: `pip install -e '.[dev]' && python -m dahua_telegram_bridge.main`.
+## Klíčové vlastnosti
 
-Diagnostika: `DAHUA_CONFIG=config.example.yaml python -m tools.probe_dahua`. Probe vypisuje raw payload i normalizovaný event a neukazuje tajné hodnoty. Parser toleruje různé názvy klíčů (`Code`, `action`, `index/channel`, `ObjectType`, `Name/Rule`). Povolené eventy jsou v `events.enabled`.
+- **Parsování reálných Dahua IVS / SMD eventů:**
+  - `CrossLineDetection`: spolehlivá detekce objektů `Human` i `Vehicle`, směru `Direction`, `RuleID`, `EventID` a vnořených struktur bez uříznutí payloadu (`data` není `{"`).
+  - `SmartMotionHuman`: tolerance pro firmware klíče `HumamID` i `HumanID`, extrakce detekčního obdélníku `Rect`.
+  - `SmartMotionVehicle`: normalizace typu `Vehicle`, extrakce `VehicleID` a `Rect`.
+  - `VideoMotion`: obecná detekce pohybu, nezaměňována za klasifikovaného člověka či vozidlo.
+  - Plná podpora variant `Start` i `Stop`.
+- **Kanály a číslování:**
+  - Oddělené uchovávání `raw_index` (0-based z firmware) a uživatelského `channel_number` (CH1, CH2, ...).
+  - Možnost automatického nebo manuálního mapování kanálů a vlastního číslování snapshotů.
+- **Správa kanálů v UI (Per-Channel Monitoring):**
+  - Každou kameru lze v UI přepnout na `Monitoring ON / OFF`.
+  - Při vypnutí monitoringu listener zůstává připojen k NVR, eventy se zaznamenávají jako diagnostické záznamy s důvodem `Filtered: channel monitoring disabled`, ale netestují snapshot ani neposílají Telegram.
+- **Pravidla jednotlivých eventů (Per-Event Rules):**
+  - Granulární nastavení pravidel pro kombinace Channel, Event Type, Object Type.
+  - Oddělené povolení monitoringu eventu a Telegram notifikace.
+- **Globální Master Switch pro Telegram:**
+  - Persistentní přepínač `Telegram notifications: ON / OFF` na Dashboardu a v Settings.
+  - Bezpečnostní pojistka: `TELEGRAM_ENABLED=false` v systémovém ENV představuje absolutní zákaz odesílání, který UI nemůže obejít.
+- **Audit změn konfigurace:**
+  - Každá změna z UI je auditována v SQLite se záznamem času, typu nastavení, kanálu, staré a nové hodnoty.
+  - Citlivé údaje (tokeny, hesla) jsou v logu i API automaticky maskovány.
 
-Vývojové kontroly: `pytest`, `ruff check .`, `mypy src`. Reálný NVR režim je oddělen od CI a používá proměnné `DAHUA_HOST`, `DAHUA_USERNAME`, `DAHUA_PASSWORD`, `DAHUA_CHANNEL`.
+## Spuštění a deployment
 
-## Production operation
+Zkopírujte `.env.example` do `.env`, vyplňte údaje a spusťte:
 
-The event path is a persistent `eventManager.cgi` connection with Digest authentication, followed by `snapshot.cgi` and Telegram `sendPhoto`. Set `DAHUA_STREAM=snapmanager` to probe the alternative `snapManager.cgi` stream; the current NVR accepted the endpoint but produced no payload during the observation window. `SNAPSHOT_MODE=auto` is reserved for selecting the event-stream/direct strategy.
+```bash
+docker compose -f deploy/docker-compose.prod.yml up -d
+```
 
-Set `TELEGRAM_ENABLED=false` for a dry run. The service logs the notification decision and never calls Telegram. Health is available at `/health`; counters are exposed at `/metrics`.
+Lokální spuštění:
+```bash
+pip install -e '.[dev]'
+python -m dahua_telegram_bridge.main
+```
 
-The production compose and deployment helper are in `deploy/`. They pull `ghcr.io/mondychan/dahua-telegram-notification:latest`, run as a restricted container, enforce a healthcheck, memory/CPU limits, and JSON log rotation. Real-NVR integration tests are under `tests/integration/` and require `DAHUA_INTEGRATION=1`; they never require Telegram.
+## Ověřovací příkazy
 
-CI runs Ruff, mypy, pytest, coverage, and Docker build on pushes and pull requests. A push to `main` publishes the container to GHCR; version tags `vX.Y.Z` are also supported by the release workflow.
-
-Current validation status: the real NVR stream and direct JPEG snapshot are verified, while CrossLineDetection and Human/SMD still require a manually triggered camera event. The `snapManager.cgi` endpoint returned HTTP 200 but produced no event/JPEG during the observation window. Local tests cover parser, filtering, deduplication, timing, dry-run, and Telegram retry behavior; NVR event HTTP integration remains mock/integration-only.
+```bash
+ruff check .
+ruff format --check .
+mypy src
+pytest -q
+pytest --cov=src --cov-report=term-missing
+docker build -t dahua-telegram-bridge .
+```

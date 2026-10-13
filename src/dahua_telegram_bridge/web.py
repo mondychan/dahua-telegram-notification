@@ -840,7 +840,12 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         return await config_view(request)
 
     async def events(request: web.Request) -> web.Response:
-        limit = int(request.query.get("limit", "100"))
+        try:
+            limit = int(request.query.get("limit", "100"))
+        except (TypeError, ValueError):
+            return web.json_response({"error": "limit must be an integer"}, status=400)
+        if limit < 1 or limit > 1000:
+            return web.json_response({"error": "limit must be between 1 and 1000"}, status=400)
         event_type = request.query.get("event_type")
         channel = (
             int(request.query["channel"])

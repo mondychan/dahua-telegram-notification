@@ -296,6 +296,11 @@ async def test_event_filtering(web_client):
     assert (await web_client.get("/api/events?event_type=Human")).status == 200
     assert (await web_client.get("/api/nvr")).status == 200
     assert (await web_client.get("/api/audit")).status == 200
+    invalid_limit = await web_client.get("/api/events?limit=oops")
+    assert invalid_limit.status == 400
+    assert (await invalid_limit.json())["error"] == "limit must be an integer"
+    out_of_range = await web_client.get("/api/events?limit=1001")
+    assert out_of_range.status == 400
 
 
 @pytest.mark.asyncio

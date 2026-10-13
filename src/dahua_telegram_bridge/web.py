@@ -725,6 +725,23 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
             }
         )
 
+    async def metrics(_request: web.Request) -> web.Response:
+        h = service.health
+        return web.json_response(
+            {
+                "events_received": h.events_received,
+                "events_filtered": h.events_filtered,
+                "events_deduplicated": h.events_deduplicated,
+                "processed_events": h.processed_events,
+                "failed_events": h.failed_events,
+                "snapshots_success": h.snapshots_success,
+                "snapshots_failed": h.snapshots_failed,
+                "telegram_sent": h.telegram_sent,
+                "telegram_failed": h.telegram_failed,
+                "reconnect_count": h.reconnect_count,
+            }
+        )
+
     async def system(_request: web.Request) -> web.Response:
         env_tg = getattr(config.telegram, "enabled", True)
         global_tg = store.get_global_setting("telegram_notifications_enabled", True)
@@ -941,6 +958,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
     app.router.add_get("/", index)
     app.router.add_post("/login", login)
     app.router.add_get("/api/health", health)
+    app.router.add_get("/api/metrics", metrics)
     app.router.add_get("/api/system", system)
     app.router.add_get("/api/nvr", nvr)
     app.router.add_get("/api/config", config_view)

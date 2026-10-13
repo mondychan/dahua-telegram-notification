@@ -4,7 +4,12 @@ import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
 from dahua_telegram_bridge.models import HealthState
-from dahua_telegram_bridge.web import Store, create_web_app
+from dahua_telegram_bridge.web import ADMIN_HTML, Store, create_web_app
+
+
+def test_event_details_modal_is_hidden_until_opened():
+    assert "<div id=modal class=hidden>" in ADMIN_HTML
+    assert "#modal.hidden{display:none}" in ADMIN_HTML
 
 
 def test_configuration_persists_across_store_reopen(tmp_path):

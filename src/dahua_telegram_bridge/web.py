@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
 import re
 import secrets
 import sqlite3
@@ -12,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from aiohttp import web
+
+log = logging.getLogger(__name__)
 
 
 LOGIN_HTML = """<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Dahua Bridge Login</title><style>body{background:#111827;color:#e5e7eb;font:16px system-ui;display:grid;place-items:center;height:100vh;margin:0}form{background:#1f2937;padding:28px;border-radius:8px;width:300px;border:1px solid #374151}input,button{display:block;width:100%;box-sizing:border-box;margin:10px 0;padding:10px;border-radius:4px;border:1px solid #4b5563;background:#111827;color:#fff}button{background:#2563eb;color:white;border:0;cursor:pointer;font-weight:600}button:hover{background:#1d4ed8}.err{color:#f87171;font-size:13px;margin:5px 0}</style></head><body><form id=f><h2>Dahua Bridge</h2><p style='color:#9ca3af;font-size:13px;margin-top:-10px'>Sign in to manage cameras and notifications</p><input id=u placeholder=username autocomplete=username value=admin><input id=p type=password placeholder=password autocomplete=current-password><button>Sign in</button><p id=e class=err></p></form><script>f.onsubmit=async ev=>{ev.preventDefault();let r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:p.value})});if(r.ok)location.href='/';else document.querySelector('#e').textContent='Invalid credentials'}</script></body></html>"""
@@ -282,7 +285,7 @@ class Store:
             match = re.search(r"ChannelTitle\[(\d+)\]\.Name$", key)
             if match and value.strip():
                 raw = int(match.group(1))
-                if 0 <= raw <= 4:
+                if 0 <= raw <= 255:
                     entries.append((raw, value.strip()))
         if not entries:
             return
@@ -717,6 +720,23 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         "titles_data": {},
     }
 
+    async def refresh_inventory() -> None:
+        """Make the persistent channel catalog follow the NVR inventory."""
+        if not service.health.nvr_connected:
+            return
+        try:
+            titles = await service.dahua.channel_titles()
+            app["nvr_cache"]["titles_data"] = titles
+            store.sync_inventory_channels(titles)
+            app["nvr_cache"]["nvr_data"] = await service.dahua.system_info()
+        except Exception as exc:
+            log.warning("NVR channel inventory refresh failed: %s", exc)
+
+    async def on_startup(_app: web.Application) -> None:
+        await refresh_inventory()
+
+    app.on_startup.append(on_startup)
+
     @web.middleware
     async def auth_middleware(request: web.Request, handler: Any) -> web.StreamResponse:
         if request.path in {"/", "/login", "/health", "/metrics"} or request.path.startswith(
@@ -928,13 +948,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         )
 
     async def channels_list(_request: web.Request) -> web.Response:
-        if service.health.nvr_connected:
-            try:
-                app["nvr_cache"]["titles_data"] = await service.dahua.channel_titles()
-                app["nvr_cache"]["nvr_data"] = await service.dahua.system_info()
-                store.sync_inventory_channels(app["nvr_cache"]["titles_data"])
-            except Exception:
-                pass
+        await refresh_inventory()
         channels = [c for c in store.channels() if 1 <= int(c["channel_number"]) <= 255]
         titles = app["nvr_cache"].get("titles_data", {})
         system = app["nvr_cache"].get("nvr_data", {})

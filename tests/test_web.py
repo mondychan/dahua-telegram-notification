@@ -201,6 +201,7 @@ async def test_channel_management_api(web_client):
     assert channels[0]["channel_number"] == 1
     assert channels[0]["monitoring_enabled"] == 1
     assert next(c for c in channels if c["channel_number"] == 4)["camera_name"] == "vjezd"
+    assert all(c["camera_model"] in (None, "") for c in channels)
 
     # CSRF check
     no_csrf = await web_client.patch("/api/channels/1", json={"monitoring_enabled": False})

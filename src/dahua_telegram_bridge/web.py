@@ -953,8 +953,20 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
                 not channel.get("camera_name") or channel["camera_name"].startswith("Camera ")
             ):
                 channel["camera_name"] = title
-            if system.get("deviceType") and not channel.get("camera_model"):
-                channel["camera_model"] = system["deviceType"]
+            # Dahua's numeric deviceType (for example "31") is an internal
+            # recorder code, not a camera model. Only expose descriptive model
+            # fields when the NVR actually provides them.
+            if not channel.get("camera_model"):
+                model = next(
+                    (
+                        system.get(key)
+                        for key in ("model", "Model", "deviceModel", "DeviceModel")
+                        if system.get(key) and not str(system[key]).isdigit()
+                    ),
+                    None,
+                )
+                if model:
+                    channel["camera_model"] = model
             if service.health.nvr_connected:
                 channel["online_status"] = "online"
         return web.json_response(channels)

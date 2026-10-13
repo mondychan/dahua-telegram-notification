@@ -13,10 +13,12 @@ from dahua_telegram_bridge.web import Store
 class FakeDahua:
     def __init__(self, fail_snapshot=False):
         self.calls = 0
+        self.channels = []
         self.fail_snapshot = fail_snapshot
 
     async def snapshot(self, channel, timeout_ms):
         self.calls += 1
+        self.channels.append(channel)
         if self.fail_snapshot:
             raise RuntimeError("NVR snapshot timeout")
         return b"jpg"
@@ -48,6 +50,36 @@ async def test_start_snapshot_and_dedup():
     await service.handle(event)
     await service.handle(event)
     assert len(t.calls) == 1 and d.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_live_videomotion_zahrada_uses_verified_snapshot_channel(tmp_store):
+    """Sanitized live-device evidence: raw index 2 (zahrada) snapshots on CH3."""
+    cfg = AppConfig(DahuaConfig("n"), TelegramConfig("token", "chat"), {"VideoMotion"})
+    d, t = FakeDahua(), FakeTelegram()
+    service = BridgeService(cfg, d, t)
+    service.store = tmp_store
+    tmp_store.ensure_channel(
+        channel_number=3,
+        raw_index=2,
+        camera_name="zahrada",
+        snapshot_channel=3,
+        source="verified",
+    )
+
+    event = parse_event(
+        (Path(__file__).parent / "fixtures" / "dahua" / "video_motion_start.txt").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert event is not None
+    await service.handle(event)
+
+    assert event.channel == 3
+    assert event.camera_name == "zahrada"
+    assert d.calls == 1
+    assert d.channels == [3]
+    assert len(t.calls) == 1 and t.calls[0][1] == b"jpg"
 
 
 @pytest.mark.asyncio

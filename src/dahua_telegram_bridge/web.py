@@ -891,7 +891,15 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         system = app["nvr_cache"].get("nvr_data", {})
         for channel in channels:
             raw = channel.get("raw_index")
-            title = titles.get(f"table.ChannelTitle[{raw}].Name") if raw is not None else None
+            title = None
+            if raw is not None:
+                for key in (
+                    f"table.ChannelTitle[{raw}].Name",
+                    f"ChannelTitle[{raw}].Name",
+                ):
+                    title = titles.get(key)
+                    if title:
+                        break
             if title and (
                 not channel.get("camera_name") or channel["camera_name"].startswith("Camera ")
             ):

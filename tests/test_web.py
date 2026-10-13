@@ -57,7 +57,7 @@ async def web_client(tmp_path):
             return {"deviceType": "31"}
 
         async def channel_titles(self):
-            return {"table.ChannelTitle[0].Name": "gate"}
+            return {"ChannelTitle[0].Name": "gate", "ChannelTitle[3].Name": "vjezd"}
 
     health = HealthState(nvr_connected=True)
     service = SimpleNamespace(health=health, dahua=Dahua(), snapshot_cache={})
@@ -86,6 +86,7 @@ async def web_client(tmp_path):
     )
     store = Store(str(tmp_path / "db.sqlite3"))
     store.ensure_channel(channel_number=1, raw_index=0, camera_name="Gate Camera")
+    store.ensure_channel(channel_number=4, raw_index=3, camera_name="Camera 4")
     app = create_web_app(service, config, store)
     async with TestServer(app) as server:
         async with TestClient(server) as client:
@@ -179,6 +180,7 @@ async def test_channel_management_api(web_client):
     assert len(channels) >= 1
     assert channels[0]["channel_number"] == 1
     assert channels[0]["monitoring_enabled"] == 1
+    assert next(c for c in channels if c["channel_number"] == 4)["camera_name"] == "vjezd"
 
     # CSRF check
     no_csrf = await web_client.patch("/api/channels/1", json={"monitoring_enabled": False})

@@ -74,7 +74,9 @@ async def test_web_login_and_rule(web_client):
     assert response.status == 200
     config = await web_client.get("/api/config")
     assert config.status == 200
-    assert "bot_token_12345" not in await config.text()\r\n    metrics = await web_client.get("/api/metrics")\r\n    assert metrics.status == 200 and "events_received" in await metrics.text()
+    assert "bot_token_12345" not in await config.text()
+    metrics = await web_client.get("/api/metrics")
+    assert metrics.status == 200 and "events_received" in await metrics.text()
     csrf = web_client.session.cookie_jar.filter_cookies(web_client.make_url("/"))[
         "csrf_token"
     ].value

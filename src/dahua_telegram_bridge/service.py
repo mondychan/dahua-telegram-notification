@@ -111,7 +111,7 @@ class BridgeService:
         # 2. Channel Monitoring Check
         if not monitoring_enabled:
             event.processing_status = "filtered"
-            event.filter_reason = "Filtered: channel monitoring disabled"
+            event.filter_reason = "channel_monitoring_disabled"
             self.health.events_filtered += 1
             if self.store is not None:
                 self.store.add_event(event)

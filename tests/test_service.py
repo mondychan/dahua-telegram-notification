@@ -114,7 +114,7 @@ async def test_channel_monitoring_toggle_off_and_on(tmp_store):
     saved_event = tmp_store.event(event_ch1.id)
     assert saved_event is not None
     assert saved_event["processing_status"] == "filtered"
-    assert "channel monitoring disabled" in saved_event["filter_reason"]
+    assert saved_event["filter_reason"] == "channel_monitoring_disabled"
 
     # Other channel (CH2, index 1) continues normally
     event_ch2 = parse_event(

@@ -123,3 +123,19 @@ class DahuaClient:
                 key, value = line.split("=", 1)
                 result[key.strip()] = value.strip()
         return result
+
+    async def remote_devices(self) -> dict[int, dict[str, str]]:
+        response = await self.client.get(
+            f"{self.config.base_url}/cgi-bin/configManager.cgi",
+            params={"action": "getConfig", "name": "RemoteDevice"},
+        )
+        response.raise_for_status()
+        result: dict[int, dict[str, str]] = {}
+        for line in response.text.splitlines():
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            match = re.search(r"RemoteDevice\.[^.]+_(\d+)\.(.+)$", key)
+            if match:
+                result.setdefault(int(match.group(1)), {})[match.group(2)] = value.strip()
+        return result

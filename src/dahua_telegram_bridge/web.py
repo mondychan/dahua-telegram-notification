@@ -718,6 +718,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         "nvr_data": {},
         "titles_expires": 0.0,
         "titles_data": {},
+        "remote_devices": {},
     }
 
     async def refresh_inventory() -> None:
@@ -729,6 +730,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
             app["nvr_cache"]["titles_data"] = titles
             store.sync_inventory_channels(titles)
             app["nvr_cache"]["nvr_data"] = await service.dahua.system_info()
+            app["nvr_cache"]["remote_devices"] = await service.dahua.remote_devices()
         except Exception as exc:
             log.warning("NVR channel inventory refresh failed: %s", exc)
 
@@ -848,8 +850,20 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
                 "https": config.dahua.https,
                 "connected": service.health.nvr_connected,
                 "channel": config.dahua.channel,
-                "system_info": cache["nvr_data"],
+                "system_info": {
+                    k: v
+                    for k, v in cache["nvr_data"].items()
+                    if k not in {"serialNumber", "serial", "updateSerial"}
+                },
                 "channel_titles": cache["titles_data"],
+                "remote_devices": {
+                    str(index): {
+                        k: value
+                        for k, value in device.items()
+                        if k not in {"Address", "UserName", "Password", "SerialNo", "SerialNumber"}
+                    }
+                    for index, device in cache.get("remote_devices", {}).items()
+                },
             }
         )
 
@@ -952,6 +966,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         channels = [c for c in store.channels() if 1 <= int(c["channel_number"]) <= 255]
         titles = app["nvr_cache"].get("titles_data", {})
         system = app["nvr_cache"].get("nvr_data", {})
+        devices = app["nvr_cache"].get("remote_devices", {})
         for channel in channels:
             raw = channel.get("raw_index")
             title = None
@@ -981,6 +996,9 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
                 )
                 if model:
                     channel["camera_model"] = model
+            device = devices.get(raw, {}) if raw is not None else {}
+            if device.get("DeviceType"):
+                channel["camera_model"] = device["DeviceType"]
             if service.health.nvr_connected:
                 channel["online_status"] = "online"
         return web.json_response(channels)

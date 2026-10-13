@@ -880,7 +880,27 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         )
 
     async def channels_list(_request: web.Request) -> web.Response:
-        return web.json_response(store.channels())
+        if service.health.nvr_connected:
+            try:
+                app["nvr_cache"]["titles_data"] = await service.dahua.channel_titles()
+                app["nvr_cache"]["nvr_data"] = await service.dahua.system_info()
+            except Exception:
+                pass
+        channels = [c for c in store.channels() if 1 <= int(c["channel_number"]) <= 255]
+        titles = app["nvr_cache"].get("titles_data", {})
+        system = app["nvr_cache"].get("nvr_data", {})
+        for channel in channels:
+            raw = channel.get("raw_index")
+            title = titles.get(f"table.ChannelTitle[{raw}].Name") if raw is not None else None
+            if title and (
+                not channel.get("camera_name") or channel["camera_name"].startswith("Camera ")
+            ):
+                channel["camera_name"] = title
+            if system.get("deviceType") and not channel.get("camera_model"):
+                channel["camera_model"] = system["deviceType"]
+            if service.health.nvr_connected:
+                channel["online_status"] = "online"
+        return web.json_response(channels)
 
     async def update_channel(request: web.Request) -> web.Response:
         if not _verify_csrf(request):

@@ -275,6 +275,54 @@ class Store:
         )
         self.db.commit()
 
+    def sync_inventory_channels(self, titles: dict[str, str]) -> None:
+        """Reconcile discovered NVR channel indexes with stable 1-based UI channels."""
+        entries: list[tuple[int, str]] = []
+        for key, value in titles.items():
+            match = re.search(r"ChannelTitle\[(\d+)\]\.Name$", key)
+            if match and value.strip():
+                raw = int(match.group(1))
+                if 0 <= raw <= 4:
+                    entries.append((raw, value.strip()))
+        if not entries:
+            return
+        self.db.execute("BEGIN")
+        try:
+            # Move matching rows to temporary negative keys to avoid unique collisions.
+            for raw, _name in entries:
+                self.db.execute(
+                    "UPDATE channels SET channel_number=? WHERE raw_index=?",
+                    (-(raw + 1), raw),
+                )
+            for raw, name in entries:
+                target = raw + 1
+                self.db.execute("UPDATE events SET channel=? WHERE raw_index=?", (target, raw))
+                row = self.db.execute(
+                    "SELECT channel_number FROM channels WHERE channel_number=?", (-(raw + 1),)
+                ).fetchone()
+                if row:
+                    self.db.execute(
+                        "UPDATE channels SET channel_number=?, camera_name=?, snapshot_channel=? WHERE channel_number=?",
+                        (target, name, target, -(raw + 1)),
+                    )
+                else:
+                    self.db.execute(
+                        "INSERT OR IGNORE INTO channels(channel_number,raw_index,camera_name,snapshot_channel,channel_mapping_source,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+                        (
+                            target,
+                            raw,
+                            name,
+                            target,
+                            "discovered",
+                            datetime.now(timezone.utc).isoformat(),
+                            datetime.now(timezone.utc).isoformat(),
+                        ),
+                    )
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
     def update_channel(self, channel_number: int, data: dict[str, Any]) -> dict[str, Any] | None:
         current = self.get_channel(channel_number)
         if current is None:
@@ -884,6 +932,7 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
             try:
                 app["nvr_cache"]["titles_data"] = await service.dahua.channel_titles()
                 app["nvr_cache"]["nvr_data"] = await service.dahua.system_info()
+                store.sync_inventory_channels(app["nvr_cache"]["titles_data"])
             except Exception:
                 pass
         channels = [c for c in store.channels() if 1 <= int(c["channel_number"]) <= 255]

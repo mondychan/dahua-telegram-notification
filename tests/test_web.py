@@ -50,6 +50,26 @@ def test_configuration_persists_across_store_reopen(tmp_path):
     reopened.close()
 
 
+def test_inventory_sync_restores_zero_based_camera_order(tmp_path):
+    store = Store(str(tmp_path / "inventory.sqlite3"))
+    store.ensure_channel(channel_number=1, raw_index=1, camera_name="dvur")
+    store.ensure_channel(channel_number=2, raw_index=2, camera_name="zahrada")
+    store.sync_inventory_channels(
+        {
+            "ChannelTitle[0].Name": "kamera vrata",
+            "ChannelTitle[1].Name": "dvur",
+            "ChannelTitle[2].Name": "zahrada",
+            "ChannelTitle[3].Name": "vjezd",
+            "ChannelTitle[4].Name": "hospoda",
+        }
+    )
+    rows = {row["channel_number"]: row for row in store.channels()}
+    assert rows[1]["camera_name"] == "kamera vrata"
+    assert rows[4]["camera_name"] == "vjezd"
+    assert rows[5]["camera_name"] == "hospoda"
+    store.close()
+
+
 @pytest.fixture
 async def web_client(tmp_path):
     class Dahua:

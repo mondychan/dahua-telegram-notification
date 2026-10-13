@@ -7,6 +7,44 @@ from dahua_telegram_bridge.models import HealthState
 from dahua_telegram_bridge.web import Store, create_web_app
 
 
+def test_configuration_persists_across_store_reopen(tmp_path):
+    db_path = tmp_path / "persistent.sqlite3"
+    first = Store(str(db_path))
+    first.ensure_channel(
+        channel_number=3,
+        raw_index=2,
+        camera_name="zahrada",
+        snapshot_channel=3,
+        source="discovered",
+    )
+    first.update_channel(3, {"monitoring_enabled": False})
+    rule_id = first.create_rule(
+        {
+            "channel": 3,
+            "event_type": "VideoMotion",
+            "object_type": None,
+            "rule_name": "zahrada",
+            "allowed_actions": "Start",
+            "monitoring_enabled": True,
+            "telegram_enabled": False,
+        }
+    )["id"]
+    first.set_global_setting("telegram_notifications_enabled", False)
+    first.close()
+
+    reopened = Store(str(db_path))
+    channel = reopened.get_channel(3)
+    rule = next(rule for rule in reopened.rules() if rule["id"] == rule_id)
+    assert channel is not None
+    assert channel["raw_index"] == 2
+    assert channel["snapshot_channel"] == 3
+    assert channel["monitoring_enabled"] == 0
+    assert rule is not None
+    assert rule["telegram_enabled"] == 0
+    assert reopened.get_global_setting("telegram_notifications_enabled") is False
+    reopened.close()
+
+
 @pytest.fixture
 async def web_client(tmp_path):
     class Dahua:

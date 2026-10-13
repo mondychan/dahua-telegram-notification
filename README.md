@@ -26,6 +26,22 @@ Persistentní bridge pro Dahua NVR event stream a Telegram Bot API. Používá `
   - Každá změna z UI je auditována v SQLite se záznamem času, typu nastavení, kanálu, staré a nové hodnoty.
   - Citlivé údaje (tokeny, hesla) jsou v logu i API automaticky maskovány.
 
+## Stav ověření konkrétního NVR
+
+Ověřená konfigurace tohoto zařízení používá 0-based `raw_index` z eventu a 1-based
+číslo pro `snapshot.cgi`: například `raw_index=2`, kamera `zahrada` → UI `CH3`
+a snapshot `channel=3`. Toto mapování je doloženo živým `VideoMotion` eventem a
+úspěšným JPEG snapshotem.
+
+Kanály 6 a 7 jsou na tomto NVR externí RTSP video-only streamy, nikoli Dahua
+kamery. Neočekávají se z nich IVS/SMD eventy ani použitelná Dahua snapshot data,
+proto nejsou součástí ověření eventového pipeline. Pokud budou někdy nahrazeny
+Dahua kamerami, je nutné jejich mapování a snapshot znovu ověřit.
+
+Historický log obsahoval `index=4` s názvem `IPC`, zatímco současná inventura
+zařízení se změnila. Tento záznam se proto nepoužívá jako důkaz současného
+mapování; při změně konfigurace je možné mapování upravit ručně v UI.
+
 ## Spuštění a deployment
 
 Zkopírujte `.env.example` do `.env`, vyplňte údaje a spusťte:

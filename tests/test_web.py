@@ -155,6 +155,25 @@ async def test_channel_management_api(web_client):
     audits = await audit_res.json()
     assert any(a["setting_type"] == "channel_monitoring" and a["channel"] == 1 for a in audits)
 
+    # Mapping fields are persisted independently and marked manual.
+    mapped = await web_client.patch(
+        "/api/channels/1",
+        json={"raw_index": 4, "snapshot_channel": 7},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert mapped.status == 200
+    row = await mapped.json()
+    assert row["raw_index"] == 4
+    assert row["snapshot_channel"] == 7
+    assert row["channel_mapping_source"] == "manual"
+
+    invalid = await web_client.patch(
+        "/api/channels/1",
+        json={"snapshot_channel": 0},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert invalid.status == 400
+
 
 @pytest.mark.asyncio
 async def test_global_settings_and_telegram_switch_api(web_client):

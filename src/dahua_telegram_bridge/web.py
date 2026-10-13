@@ -280,6 +280,18 @@ class Store:
         if current is None:
             return None
 
+        allowed = {
+            "monitoring_enabled",
+            "camera_name",
+            "camera_model",
+            "snapshot_channel",
+            "raw_index",
+            "channel_mapping_source",
+        }
+        unknown = set(data) - allowed
+        if unknown:
+            raise ValueError(f"unsupported channel fields: {', '.join(sorted(unknown))}")
+
         new_mon = (
             int(bool(data["monitoring_enabled"]))
             if "monitoring_enabled" in data
@@ -287,15 +299,31 @@ class Store:
         )
         new_name = data.get("camera_name", current["camera_name"])
         new_model = data.get("camera_model", current["camera_model"])
-        new_snap = (
-            int(data["snapshot_channel"])
-            if data.get("snapshot_channel") is not None
-            else current["snapshot_channel"]
-        )
-        new_raw = (
-            int(data["raw_index"]) if data.get("raw_index") is not None else current["raw_index"]
-        )
+        try:
+            new_snap = (
+                int(data["snapshot_channel"])
+                if data.get("snapshot_channel") is not None
+                else current["snapshot_channel"]
+            )
+            new_raw = (
+                int(data["raw_index"])
+                if data.get("raw_index") is not None
+                else current["raw_index"]
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("raw_index and snapshot_channel must be integers") from exc
+        if new_snap is not None and new_snap < 1:
+            raise ValueError("snapshot_channel must be >= 1")
+        if new_raw is not None and new_raw < 0:
+            raise ValueError("raw_index must be >= 0")
         new_src = data.get("channel_mapping_source", current["channel_mapping_source"])
+        if new_src not in {"auto", "manual", "discovered"}:
+            raise ValueError("channel_mapping_source must be auto, manual, or discovered")
+        if (
+            any(k in data for k in ("raw_index", "snapshot_channel"))
+            and "channel_mapping_source" not in data
+        ):
+            new_src = "manual"
 
         now = datetime.now(timezone.utc).isoformat()
         self.db.execute(
@@ -841,7 +869,10 @@ def create_web_app(service: Any, config: Any, store: Store | None = None) -> web
         except (ValueError, json.JSONDecodeError):
             return web.json_response({"error": "invalid channel id or payload"}, status=400)
 
-        result = store.update_channel(ch_num, data)
+        try:
+            result = store.update_channel(ch_num, data)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
         return (
             web.json_response(result)
             if result

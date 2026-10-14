@@ -19,6 +19,9 @@ async def run(config_path: str | None = None) -> None:
         level=getattr(logging, config.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    # httpx logs full request URLs. Telegram embeds the bot token in its URL.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     log_buffer = LogBuffer()
     log_buffer.setFormatter(logging.Formatter("%(message)s"))
     logging.getLogger().addHandler(log_buffer)

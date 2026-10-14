@@ -247,7 +247,11 @@ class BridgeService:
             except Exception as exc:
                 event.snapshot_status = "Snapshot failed"
                 self.health.snapshots_failed += 1
-                log.warning("snapshot failed for channel %s: %s", snapshot_channel, exc)
+                log.warning(
+                    "snapshot failed for channel %s (%s)",
+                    snapshot_channel,
+                    type(exc).__name__,
+                )
 
         # 8. Telegram Send
         try:

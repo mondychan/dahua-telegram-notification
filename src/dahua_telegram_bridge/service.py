@@ -162,7 +162,11 @@ class BridgeService:
                 if self.store is not None:
                     self.store.add_event(event)
                 return
-            if self.config.enabled_events and event.event_type not in self.config.enabled_events and event.object_type not in self.config.enabled_events:
+            if (
+                self.config.enabled_events
+                and event.event_type not in self.config.enabled_events
+                and event.object_type not in self.config.enabled_events
+            ):
                 event.processing_status = "filtered"
                 event.filter_reason = "Filtered: event rule disabled"
                 self.health.events_filtered += 1

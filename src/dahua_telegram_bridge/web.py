@@ -418,7 +418,12 @@ class Store:
         if self.db.execute("SELECT 1 FROM rules LIMIT 1").fetchone():
             return
         now = datetime.now(timezone.utc).isoformat()
-        for event_type in ("CrossLineDetection", "SmartMotionHuman", "SmartMotionVehicle", "VideoMotion"):
+        for event_type in (
+            "CrossLineDetection",
+            "SmartMotionHuman",
+            "SmartMotionVehicle",
+            "VideoMotion",
+        ):
             self.db.execute(
                 """INSERT INTO rules(channel,event_type,object_type,rule_name,allowed_actions,
                    monitoring_enabled,telegram_enabled,enabled,created_at,updated_at)

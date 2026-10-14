@@ -413,6 +413,20 @@ class Store:
         rows = self.db.execute("SELECT * FROM rules ORDER BY id DESC").fetchall()
         return [dict(row) for row in rows]
 
+    def seed_default_rules(self) -> None:
+        """Materialize the legacy default policy so the UI is the source of truth."""
+        if self.db.execute("SELECT 1 FROM rules LIMIT 1").fetchone():
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        for event_type in ("CrossLineDetection", "SmartMotionHuman", "SmartMotionVehicle", "VideoMotion"):
+            self.db.execute(
+                """INSERT INTO rules(channel,event_type,object_type,rule_name,allowed_actions,
+                   monitoring_enabled,telegram_enabled,enabled,created_at,updated_at)
+                   VALUES(NULL,?,?,?,?,?,?,?,?,?)""",
+                (event_type, None, None, "Start", 1, 1, 1, now, now),
+            )
+        self.db.commit()
+
     def create_rule(self, data: dict[str, Any]) -> dict[str, Any]:
         if not data.get("event_type"):
             raise ValueError("event_type is required")
@@ -707,6 +721,8 @@ def _auth(request: web.Request) -> bool:
 
 def create_web_app(service: Any, config: Any, store: Store | None = None) -> web.Application:
     store = store or Store(getattr(config, "data_path", "/data/bridge.sqlite3"))
+    # Keep event policy visible and editable in the UI; never rely on a hidden fallback.
+    store.seed_default_rules()
     app = web.Application()
     app["store"] = store
     app["admin_password"] = getattr(config, "admin_password", "")

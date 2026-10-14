@@ -146,7 +146,15 @@ class BridgeService:
                 return
             rule_telegram_enabled = bool(rule.get("telegram_enabled", 1))
         else:
-            # Default fallback policy
+            if self.store is not None and self.store.rules():
+                # Rules are the single source of truth. A missing rule must be
+                # visible as a filtered event rather than a hidden fallback.
+                event.processing_status = "filtered"
+                event.filter_reason = "Filtered: no matching notification rule"
+                self.health.events_filtered += 1
+                self.store.add_event(event)
+                return
+            # Compatibility for library users with an uninitialized store.
             if not self.config.send_stop and not event.is_start:
                 event.processing_status = "filtered"
                 event.filter_reason = "Filtered: action Stop"
@@ -154,18 +162,13 @@ class BridgeService:
                 if self.store is not None:
                     self.store.add_event(event)
                 return
-            if self.config.enabled_events:
-                type_allowed = event.event_type in self.config.enabled_events or (
-                    event.object_type is not None
-                    and event.object_type in self.config.enabled_events
-                )
-                if not type_allowed:
-                    event.processing_status = "filtered"
-                    event.filter_reason = "Filtered: event rule disabled"
-                    self.health.events_filtered += 1
-                    if self.store is not None:
-                        self.store.add_event(event)
-                    return
+            if self.config.enabled_events and event.event_type not in self.config.enabled_events and event.object_type not in self.config.enabled_events:
+                event.processing_status = "filtered"
+                event.filter_reason = "Filtered: event rule disabled"
+                self.health.events_filtered += 1
+                if self.store is not None:
+                    self.store.add_event(event)
+                return
 
         # 4. Deduplication
         if self.config.dedup_enabled and self._duplicate(event):

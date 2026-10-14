@@ -91,12 +91,20 @@ class DahuaClient:
                     buffer = buffer[separator + sep_len :]
 
     async def snapshot(self, channel: int, timeout_ms: int) -> bytes:
+        # Dahua Digest authentication performs an initial 401 challenge before
+        # the authenticated request. A 1 s image timeout can expire during that
+        # handshake, causing a text-only Telegram message even though the NVR
+        # is reachable. Keep the caller's timeout as a lower bound but allow
+        # enough time for the challenge and JPEG response.
+        request_timeout = max(timeout_ms / 1000, 5.0)
         response = await self.client.get(
             f"{self.config.base_url}/cgi-bin/snapshot.cgi",
             params={"channel": channel},
-            timeout=timeout_ms / 1000,
+            timeout=request_timeout,
         )
         response.raise_for_status()
+        if not response.content.startswith(b"\xff\xd8"):
+            raise ValueError("snapshot response is not a JPEG")
         return response.content
 
     async def system_info(self) -> dict[str, str]:
